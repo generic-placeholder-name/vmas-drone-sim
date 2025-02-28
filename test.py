@@ -30,24 +30,25 @@ envConfig = {
         "bottomRight": scale_coordinate([486, 253])
     },
     "rewardAreas": [
-        [scale_coordinate(coord) for coord in [
-            [187, 130], [241, 153], [265, 153], [261, 240], [184, 239]
-        ]],
-        [scale_coordinate(coord) for coord in [
-            [213, 58], [229, 57], [244, 77], [274, 78], [305, 67], [293, 140], [255, 140], [204, 120]
-        ]],
-        [scale_coordinate(coord) for coord in [
-            [311, 58], [360, 60], [360, 140], [303, 140]
-        ]],
-        [scale_coordinate(coord) for coord in [
-            [365, 16], [471, 15], [475, 87], [364, 89]
-        ]],
-        [scale_coordinate(coord) for coord in [
-            [372, 173], [477, 174], [480, 240], [370, 241]
-        ]],
-        [scale_coordinate(coord) for coord in [
-            [381, 98], [476, 92], [479, 166], [382, 164]
-        ]]
+        [scale_coordinate([181, 7]), scale_coordinate([181, 253]), scale_coordinate([486, 253]), scale_coordinate([486, 7])]
+        # [scale_coordinate(coord) for coord in [
+        #     [187, 130], [241, 153], [265, 153], [261, 240], [184, 239]
+        # ]],
+        # [scale_coordinate(coord) for coord in [
+        #     [213, 58], [229, 57], [244, 77], [274, 78], [305, 67], [293, 140], [255, 140], [204, 120]
+        # ]],
+        # [scale_coordinate(coord) for coord in [
+        #     [311, 58], [360, 60], [360, 140], [303, 140]
+        # ]],
+        # [scale_coordinate(coord) for coord in [
+        #     [365, 16], [471, 15], [475, 87], [364, 89]
+        # ]],
+        # [scale_coordinate(coord) for coord in [
+        #     [372, 173], [477, 174], [480, 240], [370, 241]
+        # ]],
+        # [scale_coordinate(coord) for coord in [
+        #     [381, 98], [476, 92], [479, 166], [382, 164]
+        # ]]
     ],
     "penaltyAreas": [ 
         {
@@ -87,7 +88,7 @@ class Scenario(BaseScenario):
         # Load environment configuration
         self.env_config = kwargs.pop("env_config", envConfig)
         self.shared_reward = kwargs.pop("shared_reward", False)
-        self.grid_resolution = kwargs.pop("reward_grid_resolution", 0.01)
+        self.grid_resolution = kwargs.pop("reward_grid_resolution", 0.2)
         self.agent_u_multiplier = kwargs.pop("agent_u_multiplier", 0.5)
         ScenarioUtils.check_kwargs_consumed(kwargs)
 
@@ -112,18 +113,19 @@ class Scenario(BaseScenario):
         for i in range(self.n_agents):
             agent = Agent(
                 name=f"agent_{i}",
+                rotatable=True,
                 shape=Sphere(self.agent_radius),
-                u_multiplier=self.agent_u_multiplier,
+                u_multiplier=self.agent_u_multiplier
             )
             world.add_agent(agent)
             self.agent_pos.append(torch.Tensor(self.env_config["startingPoints"][i], device=device) * 2 - world_dims)
 
-        # Generate goal points in reward areas
+        # Generate goal (waypoints) points in reward areas
         for x in torch.arange(0, world_width, self.grid_resolution):
             for y in torch.arange(0, world_height, self.grid_resolution):
                 point = [x.item(), y.item()]
                 for reward_area in self.env_config["rewardAreas"]:
-                    if is_point_in_polygon(point, reward_area):
+                    if is_point_in_polygon(point, reward_area): # TODO: Check that point not in penalty areas
                         goal = Landmark(
                             name=f"goal {len(self.goal_pos)}",
                             collide=False,
@@ -156,7 +158,7 @@ class Scenario(BaseScenario):
 
         return world
 
-    def reset_world_at(self, env_index: int = None):
+    def reset_world_at(self, env_index: int | None = None):
         n_goals = len(self.goal_pos)
         agents = [self.world.agents[i] for i in torch.randperm(self.n_agents).tolist()]
         goals = [self.world.landmarks[i] for i in torch.randperm(n_goals).tolist()]
