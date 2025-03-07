@@ -1,9 +1,16 @@
+import typing
+from typing import List
+
 import torch
 
 from vmas import render_interactively
 from vmas.simulator.core import Agent, Box, Landmark, Line, Sphere, World
+from vmas.simulator.dynamics.diff_drive import DiffDrive
+from vmas.simulator.dynamics.holonomic_with_rot import HolonomicWithRotation
 from vmas.simulator.scenario import BaseScenario
 from vmas.simulator.utils import Color, ScenarioUtils
+if typing.TYPE_CHECKING:
+    from vmas.simulator.rendering import Geom
 
 # Coordinates taken from image on Google Docs.
 # Reward areas are areas with crops; penalty areas are the house and the greenhouse
@@ -89,7 +96,7 @@ class Scenario(BaseScenario):
         self.env_config = kwargs.pop("env_config", envConfig)
         self.shared_reward = kwargs.pop("shared_reward", False)
         self.grid_resolution = kwargs.pop("reward_grid_resolution", 0.2)
-        self.agent_u_multiplier = kwargs.pop("agent_u_multiplier", 0.5)
+        self.agent_u_multiplier = kwargs.pop("agent_u_multiplier", 0.05)
         ScenarioUtils.check_kwargs_consumed(kwargs)
 
         self.n_agents = 2
@@ -113,9 +120,12 @@ class Scenario(BaseScenario):
         for i in range(self.n_agents):
             agent = Agent(
                 name=f"agent_{i}",
-                rotatable=True,
+                collide=True,
+                render_action=True,
+                u_range=[1, 1],
+                u_multiplier=[0.05, 0.5], #[linear, angular]
                 shape=Sphere(self.agent_radius),
-                u_multiplier=self.agent_u_multiplier
+                dynamics=DiffDrive(world, integration="rk4"),
             )
             world.add_agent(agent)
             self.agent_pos.append(torch.Tensor(self.env_config["startingPoints"][i], device=device) * 2 - world_dims)
@@ -190,21 +200,33 @@ class Scenario(BaseScenario):
     def observation(self, agent: Agent):
         # get positions of all entities in this agent's reference frame
         landmarks = self.world.landmarks[self.n_agents :]
+        observations = [
+            agent.state.pos,
+            agent.state.vel,
+            #*[landmark.state.pos - agent.state.pos for landmark in landmarks]
+        ]
+        
         return torch.cat(
-            [
-                agent.state.pos,
-                agent.state.vel,
-                *[landmark.state.pos - agent.state.pos for landmark in landmarks],
-            ],
+            observations,
             dim=-1,
         )
 
     # def done(self): not implemented yet
 
     # def extra_render(self, env_index: int = 0):
+    def extra_render(self, env_index: int = 0) -> "List[Geom]":
 
+        geoms: List[Geom] = []
+
+        # Agent rotation
+        for agent in self.world.agents:
+            geoms.append(
+                ScenarioUtils.plot_entity_rotation(agent, env_index, length=0.1)
+            )
+
+        return geoms
 
 if __name__ == "__main__":
     render_interactively(
-        Scenario(), control_two_agents=True, shared_reward=False
+        Scenario(), control_two_agents=True, shared_reward=True
     )
