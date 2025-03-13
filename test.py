@@ -108,6 +108,7 @@ class Scenario(BaseScenario):
         # Make world
         world = World(batch_dim, device, x_semidim=world_width, y_semidim=world_height)
         world_dims = torch.Tensor([world_width, world_height])
+        self._world = world
 
         # Add agents
         for i in range(self.n_agents):
@@ -132,10 +133,14 @@ class Scenario(BaseScenario):
                             shape=Sphere(radius=self.reward_radius),
                             color=Color.LIGHT_GREEN,
                         )
+                        # if agent in point
                         world.add_landmark(goal)
                         self.goal_pos.append(torch.Tensor(point, device=device) * 2 - world_dims)
-                        break 
+                        break
+        self.waypoint_visits = torch.zeros(self.n_agents, device=device)  # Counter for waypoint visits
 
+        self.prev_positions = {agent.name: agent.state.pos.clone() for agent in self.world.agents}  # Store initial positions
+        self.total_distance = {agent.name: 0.0 for agent in self.world.agents}  # Track total distance
         # Add penalty areas as landmarks
         for i, penalty_area in enumerate(self.env_config["penaltyAreas"]):
             top_left = penalty_area["topLeft"]
@@ -164,6 +169,7 @@ class Scenario(BaseScenario):
         goals = [self.world.landmarks[i] for i in torch.randperm(n_goals).tolist()]
         order = range(len(self.world.landmarks[n_goals :]))
         obstacles = [self.world.landmarks[n_goals :][i] for i in order]
+        self.waypoint_visits = torch.zeros(self.n_agents, device=self.world.device) # reset the counter
         for i, goal in enumerate(goals):
             goal.set_pos(
                 self.goal_pos[i],
@@ -181,13 +187,38 @@ class Scenario(BaseScenario):
             )
 
     def reward(self, agent: Agent): # dummy function, which does nothing for now
-        return torch.zeros(
+        rew = torch.zeros(
             self.world.batch_dim,
             device=self.world.device,
             dtype=torch.float32,
             )
+        for i, goal in enumerate(self.goal_pos):
+            if torch.norm(agent.state.pos - goal) < self.reward_radius:
+                rew += 1.0 
+                agent_index = int(agent.name.split("_")[1])
+                self.waypoint_visits[agent_index] += 1  # Increment counter
+        for agent in self.world.agents:
+            agent_index = int(agent.name.split("_")[1])
+            # print(f"Agent {agent.name} waypoint visits: {self.waypoint_visits[agent_index].item()}")
+            print(f"Agent {agent.name} total distance: {self.total_distance[agent.name]:.2f}")
+        return rew
 
     def observation(self, agent: Agent):
+        # Get the current position
+        current_pos = agent.state.pos
+
+        # Get the previous position
+        prev_pos = self.prev_positions[agent.name]
+
+        # Find the distance traveled since the last step
+        distance = torch.norm(current_pos - prev_pos).item()  # Euclidean distance
+
+        # Update the total distance covered
+        self.total_distance[agent.name] += distance
+
+        # Update the previous spot to the current spot for the next step
+        self.prev_positions[agent.name] = current_pos.clone()
+
         # get positions of all entities in this agent's reference frame
         landmarks = self.world.landmarks[self.n_agents :]
         return torch.cat(
