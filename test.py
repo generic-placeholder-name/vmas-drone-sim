@@ -2,6 +2,7 @@ import typing
 from typing import List
 
 import torch
+from graph import *
 
 from vmas import render_interactively
 from vmas.simulator.core import Agent, Box, Landmark, Line, Sphere, World
@@ -165,7 +166,8 @@ class Scenario(BaseScenario):
                         )
                         # if agent in point
                         world.add_landmark(goal)
-                        self.waypoints.append(torch.Tensor(point, device=device) * 2 - world_dims)
+                        scaled_point = torch.Tensor(point, device=device) * 2 - world_dims
+                        self.waypoints.append(Waypoint(scaled_point, goal, reward_radius=self.reward_radius))
                         break
         self.waypoint_visits = torch.zeros([self.n_agents, len(self.waypoints)], device=device)  # Track waypoints visited by each drone
         self.prev_positions = [agent.state.pos for agent in self.world.agents]
@@ -182,7 +184,7 @@ class Scenario(BaseScenario):
         self.total_distance = torch.tensor([0.0 for _ in self.world.agents])
         for i, goal in enumerate(goals):
             goal.set_pos(
-                self.waypoints[i],
+                self.waypoints[i].point,
                 batch_index=env_index,
             )
         for i, agent in enumerate(agents):
