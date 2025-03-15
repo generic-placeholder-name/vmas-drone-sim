@@ -156,8 +156,6 @@ class Scenario(BaseScenario):
         for x in torch.arange(0, world_width, self.grid_resolution):
             for y in torch.arange(0, world_height, self.grid_resolution):
                 point = [x.item(), y.item()]
-                print("point:", point)
-                print(f"x, y: {type(x.item())}, {type(y)}")
                 for reward_area in self.env_config["rewardAreas"]:
                     if is_point_in_polygon(point, reward_area): # TODO: Check that point not in penalty areas
                         goal = Landmark(
