@@ -8,8 +8,10 @@ from vmas.simulator.utils import Color, ScenarioUtils
 # Coordinates taken from image on Google Docs.
 # Reward areas are areas with crops; penalty areas are the house and the greenhouse
 # Original frame coordinates
-original_top_left = [181, 7]
-original_bottom_right = [486, 253]
+# original_top_left = [181, 7]
+# original_bottom_right = [486, 253]
+original_top_left = [0, 0]
+original_bottom_right = [875, 620]
 
 original_width = original_bottom_right[0] - original_top_left[0]
 original_height = original_bottom_right[1] - original_top_left[1]
@@ -26,8 +28,8 @@ def scale_coordinate(coord):
 
 envConfig = {
     "borders": {
-        "topLeft": scale_coordinate([181, 7]),
-        "bottomRight": scale_coordinate([486, 253])
+        "topLeft": scale_coordinate(original_top_left),
+        "bottomRight": scale_coordinate(original_bottom_right)
     },
     "rewardAreas": [
         [scale_coordinate([181, 7]), scale_coordinate([181, 253]), scale_coordinate([486, 253]), scale_coordinate([486, 7])]
@@ -52,12 +54,12 @@ envConfig = {
     ],
     "penaltyAreas": [ 
         {
-            "topLeft": scale_coordinate([365, 100]),
-            "bottomRight": scale_coordinate([378, 137])
+            "topLeft": scale_coordinate([350, 620-500]),
+            "bottomRight": scale_coordinate([426, 620-400])
         },
         {
-            "topLeft": scale_coordinate([304, 150]),
-            "bottomRight": scale_coordinate([350, 200])
+            "topLeft": scale_coordinate([485, 620-340]),
+            "bottomRight": scale_coordinate([525, 620-242])
         }
     ],
     "startingPoints": [
@@ -148,13 +150,14 @@ class Scenario(BaseScenario):
                 name=f"obstacle {i}",
                 collide=True,  # Penalty areas are collidable
                 movable=False,
-                shape=Box(length=length, width=width),
+                shape=Box(length=length*2, width=width*2),
                 color=Color.RED,
                 collision_filter=lambda e: not isinstance(e.shape, Box),
             )
             
             world.add_landmark(obs)
-            self.obs_pos.append(torch.Tensor(center, device=device) * 2 - world_dims)
+            print(world_dims,center)
+            self.obs_pos.append(torch.Tensor(center, device=device)*2 - world_dims)
 
         return world
 
