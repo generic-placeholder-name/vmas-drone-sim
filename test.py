@@ -1,9 +1,17 @@
+import typing
+from typing import List
+
 import torch
+from graph import *
 
 from vmas import render_interactively
 from vmas.simulator.core import Agent, Box, Landmark, Line, Sphere, World
+from vmas.simulator.dynamics.diff_drive import DiffDrive
+from vmas.simulator.dynamics.holonomic_with_rot import HolonomicWithRotation
 from vmas.simulator.scenario import BaseScenario
 from vmas.simulator.utils import Color, ScenarioUtils
+if typing.TYPE_CHECKING:
+    from vmas.simulator.rendering import Geom
 
 # Coordinates taken from image on Google Docs.
 # Reward areas are areas with crops; penalty areas are the house and the greenhouse
@@ -91,7 +99,7 @@ class Scenario(BaseScenario):
         self.env_config = kwargs.pop("env_config", envConfig)
         self.shared_reward = kwargs.pop("shared_reward", False)
         self.grid_resolution = kwargs.pop("reward_grid_resolution", 0.2)
-        self.agent_u_multiplier = kwargs.pop("agent_u_multiplier", 0.5)
+        self.agent_u_multiplier = kwargs.pop("agent_u_multiplier", 0.05)
         ScenarioUtils.check_kwargs_consumed(kwargs)
 
         self.n_agents = 2
@@ -103,40 +111,28 @@ class Scenario(BaseScenario):
         world_width = self.env_config["borders"]["bottomRight"][0]
         world_height = self.env_config["borders"]["bottomRight"][1]
 
-        self.goal_pos = []
+        self.waypoints = []
         self.obs_pos = []
-        self.agent_pos = []
+        self.agent_start_pos = []
 
         # Make world
         world = World(batch_dim, device, x_semidim=world_width, y_semidim=world_height)
+        self._world = world
         world_dims = torch.Tensor([world_width, world_height])
 
         # Add agents
         for i in range(self.n_agents):
             agent = Agent(
                 name=f"agent_{i}",
-                rotatable=True,
+                collide=True,
+                render_action=True,
+                u_range=[1, 1],
+                u_multiplier=[0.05, 0.5], #[linear, angular]
                 shape=Sphere(self.agent_radius),
-                u_multiplier=self.agent_u_multiplier
+                dynamics=DiffDrive(world, integration="rk4"),
             )
             world.add_agent(agent)
-            self.agent_pos.append(torch.Tensor(self.env_config["startingPoints"][i], device=device) * 2 - world_dims)
-
-        # Generate goal (waypoints) points in reward areas
-        for x in torch.arange(0, world_width, self.grid_resolution):
-            for y in torch.arange(0, world_height, self.grid_resolution):
-                point = [x.item(), y.item()]
-                for reward_area in self.env_config["rewardAreas"]:
-                    if is_point_in_polygon(point, reward_area): # TODO: Check that point not in penalty areas
-                        goal = Landmark(
-                            name=f"goal {len(self.goal_pos)}",
-                            collide=False,
-                            shape=Sphere(radius=self.reward_radius),
-                            color=Color.LIGHT_GREEN,
-                        )
-                        world.add_landmark(goal)
-                        self.goal_pos.append(torch.Tensor(point, device=device) * 2 - world_dims)
-                        break 
+            self.agent_start_pos.append(torch.Tensor(self.env_config["startingPoints"][i], device=device) * 2 - world_dims)
 
         # Add penalty areas as landmarks
         for i, penalty_area in enumerate(self.env_config["penaltyAreas"]):
@@ -146,7 +142,7 @@ class Scenario(BaseScenario):
             width = bottom_right[1] - top_left[1]
             center = [(top_left[0] + bottom_right[0]) / 2, (top_left[1] + bottom_right[1]) / 2]
 
-            obs = Landmark(
+            obstacle = Landmark(
                 name=f"obstacle {i}",
                 collide=True,  # Penalty areas are collidable
                 movable=False,
@@ -155,59 +151,131 @@ class Scenario(BaseScenario):
                 collision_filter=lambda e: not isinstance(e.shape, Box),
             )
             
-            world.add_landmark(obs)
-            print(world_dims,center)
-            self.obs_pos.append(torch.Tensor(center, device=device)*2 - world_dims)
+            world.add_landmark(obstacle)
+            self.obs_pos.append(torch.Tensor(center, device=device) * 2 - world_dims)
 
+        # Generate goal (waypoints) points in reward areas
+        for x in torch.arange(0, world_width, self.grid_resolution):
+            for y in torch.arange(0, world_height, self.grid_resolution):
+                point = [x.item(), y.item()]
+                for reward_area in self.env_config["rewardAreas"]:
+                    if is_point_in_polygon(point, reward_area): # TODO: Check that point not in penalty areas
+                        goal = Landmark(
+                            name=f"goal {len(self.waypoints)}",
+                            collide=False,
+                            shape=Sphere(radius=self.reward_radius),
+                            color=Color.LIGHT_GREEN,
+                        )
+                        # if agent in point
+                        world.add_landmark(goal)
+                        scaled_point = torch.Tensor(point, device=device) * 2 - world_dims
+                        self.waypoints.append(Waypoint(scaled_point, goal, reward_radius=self.reward_radius))
+                        break
+        self.waypoint_visits = torch.zeros([self.n_agents, len(self.waypoints)], device=device)  # Track waypoints visited by each drone
+        self.prev_positions = [agent.state.pos for agent in self.world.agents]
+        self.total_distance = torch.zeros(len(self.world.agents), device=device)
         return world
-
+    
     def reset_world_at(self, env_index: int | None = None):
-        n_goals = len(self.goal_pos)
+        n_goals = len(self.waypoints)
         agents = [self.world.agents[i] for i in torch.randperm(self.n_agents).tolist()]
         goals = [self.world.landmarks[i] for i in torch.randperm(n_goals).tolist()]
         order = range(len(self.world.landmarks[n_goals :]))
         obstacles = [self.world.landmarks[n_goals :][i] for i in order]
+        self.waypoint_visits = torch.zeros([self.n_agents, len(self.waypoints)], device=self.world.device) # reset the counter
+        self.total_distance = torch.tensor([0.0 for _ in self.world.agents])
         for i, goal in enumerate(goals):
             goal.set_pos(
-                self.goal_pos[i],
+                self.waypoints[i].point,
                 batch_index=env_index,
             )
         for i, agent in enumerate(agents):
             agent.set_pos(
-                self.agent_pos[i],
+                self.agent_start_pos[i],#self.world.agents[i].state.pos,
                 batch_index=env_index,
             )
         for i, obstacle in enumerate(obstacles):
             obstacle.set_pos(
+ 
                 self.obs_pos[i],
+ 
                 batch_index=env_index,
+ 
             )
 
-    def reward(self, agent: Agent): # dummy function, which does nothing for now
-        return torch.zeros(
+    def reward(self, agent: Agent):
+        agent_index = self.get_agent_index(agent)
+        reward = torch.zeros(
             self.world.batch_dim,
             device=self.world.device,
             dtype=torch.float32,
             )
+        for i, landmark in enumerate(self.world.landmarks):
+            if landmark.state.pos is not None and agent.state.pos is not None:
+                if landmark.name.startswith("goal"):
+                    if torch.linalg.vector_norm(landmark.state.pos - agent.state.pos) < self.reward_radius:
+                        reward += 1.0
+                        self.waypoint_visits[agent_index, i] += 1
+                        print(f"Agent {agent_index} reached waypoint {i}!")
+                        print(f"Waypoint visits: {self.waypoint_visits[agent_index]}")
+                        print(f"reward: {reward}")
+                        print(f"total distance: {self.total_distance[agent_index]}")
+                        print("----------------------------")
+                elif landmark.name.startswith("obstacle"):
+                    if landmark.collides(agent):
+                        reward -= reward # set to zero
+        return reward
 
     def observation(self, agent: Agent):
-        # get positions of all entities in this agent's reference frame
-        landmarks = self.world.landmarks[self.n_agents :]
+        # Update distance information
+        agent_index = self.get_agent_index(agent)
+        current_pos = agent.state.pos
+        prev_pos = self.prev_positions[agent_index]
+
+        # Find the distance traveled since the last step
+        distance = 0.0
+        if prev_pos is not None and current_pos is not None:
+            distance = torch.linalg.vector_norm(current_pos - prev_pos)
+
+        self.total_distance[agent_index] += distance
+        self.prev_positions[agent_index] = current_pos
+
+        # Get positions of all landmarks in this agent's reference frame
+        landmark_rel_poses = []
+        for landmark in self.world.landmarks:
+            assert landmark.state.pos is not None and agent.state.pos is not None, "Landmark or agent position is None"
+            landmark_rel_poses.append(landmark.state.pos - agent.state.pos)
         return torch.cat(
             [
-                agent.state.pos,
-                agent.state.vel,
-                *[landmark.state.pos - agent.state.pos for landmark in landmarks],
+                agent.state.pos if agent.state.pos is not None else torch.zeros(2, device=agent.device),
+                agent.state.vel if agent.state.vel is not None else torch.zeros(2, device=agent.device),
+                *landmark_rel_poses,
             ],
             dim=-1,
         )
+    
+    def get_agent_index(self, agent: Agent):
+        return int(agent.name.split("_")[1])
+    
+    def get_waypoint_index(self, goal: Landmark):
+        return int(goal.name.split("_")[1])
 
     # def done(self): not implemented yet
 
     # def extra_render(self, env_index: int = 0):
+    def extra_render(self, env_index: int = 0) -> "List[Geom]":
 
+        geoms: List[Geom] = []
+
+        # Agent rotation
+        for agent in self.world.agents:
+            geoms.append(
+                ScenarioUtils.plot_entity_rotation(agent, env_index, length=0.1)
+            )
+
+        return geoms
 
 if __name__ == "__main__":
     render_interactively(
-        Scenario(), control_two_agents=True, shared_reward=False
+        Scenario(), control_two_agents=True, shared_reward=True
     )
