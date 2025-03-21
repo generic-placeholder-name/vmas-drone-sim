@@ -18,6 +18,7 @@ if typing.TYPE_CHECKING:
 # Original frame coordinates
 # original_top_left = [181, 7]
 # original_bottom_right = [486, 253]
+# Changed to feet x feet of farm, measured from google maps
 original_top_left = [0, 0]
 original_bottom_right = [875, 620]
 
@@ -62,7 +63,8 @@ envConfig = {
     ],
     "penaltyAreas": [ 
         {
-            "topLeft": scale_coordinate([350, 620-500]),
+            #Second coordinate is subtracted because  value, i.e. 500, was measured from top-left of image, vmas wants it from bottom left
+            "topLeft": scale_coordinate([350, 620-500]),  
             "bottomRight": scale_coordinate([426, 620-400])
         },
         {
@@ -165,7 +167,7 @@ class Scenario(BaseScenario):
                 name=f"obstacle {i}",
                 collide=True,  # Penalty areas are collidable
                 movable=False,
-                shape=Box(length=length*2, width=width*2),
+                shape=Box(length=length*2, width=width*2), # Need to multiply by two due to nature of vmas coordinate system
                 color=Color.RED,
                 collision_filter=lambda e: not isinstance(e.shape, Box),
             )
