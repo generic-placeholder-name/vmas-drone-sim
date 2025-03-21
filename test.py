@@ -134,6 +134,25 @@ class Scenario(BaseScenario):
             world.add_agent(agent)
             self.agent_start_pos.append(torch.Tensor(self.env_config["startingPoints"][i], device=device) * 2 - world_dims)
 
+        # Generate goal (waypoints) points in reward areas
+        for x in torch.arange(0, world_width, self.grid_resolution):
+            for y in torch.arange(0, world_height, self.grid_resolution):
+                point = [x.item(), y.item()]
+                for reward_area in self.env_config["rewardAreas"]:
+                    if is_point_in_polygon(point, reward_area): # TODO: Check that point not in penalty areas
+                        goal = Landmark(
+                            name=f"goal {len(self.waypoints)}",
+                            collide=False,
+                            shape=Sphere(radius=self.reward_radius),
+                            color=Color.LIGHT_GREEN,
+                        )
+                        # if agent in point
+                        world.add_landmark(goal)
+                        scaled_point = torch.Tensor(point, device=device) * 2 - world_dims
+                        self.waypoints.append(Waypoint(scaled_point, goal, reward_radius=self.reward_radius))
+                        break
+        self.waypoint_visits = torch.zeros([self.n_agents, len(self.waypoints)], device=device)  # Track waypoints visited by each drone
+
         # Add penalty areas as landmarks
         for i, penalty_area in enumerate(self.env_config["penaltyAreas"]):
             top_left = penalty_area["topLeft"]
@@ -154,26 +173,9 @@ class Scenario(BaseScenario):
             world.add_landmark(obstacle)
             self.obs_pos.append(torch.Tensor(center, device=device) * 2 - world_dims)
 
-        # Generate goal (waypoints) points in reward areas
-        for x in torch.arange(0, world_width, self.grid_resolution):
-            for y in torch.arange(0, world_height, self.grid_resolution):
-                point = [x.item(), y.item()]
-                for reward_area in self.env_config["rewardAreas"]:
-                    if is_point_in_polygon(point, reward_area): # TODO: Check that point not in penalty areas
-                        goal = Landmark(
-                            name=f"goal {len(self.waypoints)}",
-                            collide=False,
-                            shape=Sphere(radius=self.reward_radius),
-                            color=Color.LIGHT_GREEN,
-                        )
-                        # if agent in point
-                        world.add_landmark(goal)
-                        scaled_point = torch.Tensor(point, device=device) * 2 - world_dims
-                        self.waypoints.append(Waypoint(scaled_point, goal, reward_radius=self.reward_radius))
-                        break
-        self.waypoint_visits = torch.zeros([self.n_agents, len(self.waypoints)], device=device)  # Track waypoints visited by each drone
         self.prev_positions = [agent.state.pos for agent in self.world.agents]
         self.total_distance = torch.zeros(len(self.world.agents), device=device)
+        
         return world
     
     def reset_world_at(self, env_index: int | None = None):
@@ -213,7 +215,8 @@ class Scenario(BaseScenario):
         for i, landmark in enumerate(self.world.landmarks):
             if landmark.state.pos is not None and agent.state.pos is not None:
                 if landmark.name.startswith("goal"):
-                    if torch.linalg.vector_norm(landmark.state.pos - agent.state.pos) < self.reward_radius:
+                    # print(i, landmark.state.pos, agent.state.pos, torch.linalg.vector_norm(landmark.state.pos - agent.state.pos), self.reward_radius)
+                    if self.world.is_overlapping(agent, landmark) and self.waypoint_visits[agent_index, i] == 0:
                         reward += 1.0
                         self.waypoint_visits[agent_index, i] += 1
                         print(f"Agent {agent_index} reached waypoint {i}!")
@@ -221,9 +224,11 @@ class Scenario(BaseScenario):
                         print(f"reward: {reward}")
                         print(f"total distance: {self.total_distance[agent_index]}")
                         print("----------------------------")
-                elif landmark.name.startswith("obstacle"):
+                elif self.world.is_overlapping(agent, landmark):
                     if landmark.collides(agent):
-                        reward -= reward # set to zero
+                        reward -= reward + 100.0 # set to -100
+                        print(f"Collision by agent {agent_index}")
+                        print("----------------------------")
         return reward
 
     def observation(self, agent: Agent):
