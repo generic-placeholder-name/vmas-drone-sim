@@ -116,7 +116,7 @@ class Scenario(BaseScenario):
         self.waypoints = []
         self.obs_pos = []
         self.agent_start_pos = []
-
+        self.last_waypoint = {i: None for i in range(self.n_agents)}
         # Make world
         world = World(batch_dim, device, x_semidim=world_width, y_semidim=world_height)
         self._world = world
@@ -135,7 +135,9 @@ class Scenario(BaseScenario):
             )
             world.add_agent(agent)
             self.agent_start_pos.append(torch.Tensor(self.env_config["startingPoints"][i], device=device) * 2 - world_dims)
-
+        
+        self.total_rotation = torch.zeros(len(self.world.agents), device=device)  # Track total rotation for each agent
+        self.prev_rotations = [agent.state.rot for agent in self.world.agents]  # Track previous rotation for each agent
         # Generate goal (waypoints) points in reward areas
         for x in torch.arange(0, world_width, self.grid_resolution):
             for y in torch.arange(0, world_height, self.grid_resolution):
@@ -154,7 +156,7 @@ class Scenario(BaseScenario):
                         self.waypoints.append(Waypoint(scaled_point, goal, reward_radius=self.reward_radius))
                         break
         self.waypoint_visits = torch.zeros([self.n_agents, len(self.waypoints)], device=device)  # Track waypoints visited by each drone
-
+        
         # Add penalty areas as landmarks
         for i, penalty_area in enumerate(self.env_config["penaltyAreas"]):
             top_left = penalty_area["topLeft"]
@@ -188,6 +190,8 @@ class Scenario(BaseScenario):
         obstacles = [self.world.landmarks[n_goals :][i] for i in order]
         self.waypoint_visits = torch.zeros([self.n_agents, len(self.waypoints)], device=self.world.device) # reset the counter
         self.total_distance = torch.tensor([0.0 for _ in self.world.agents])
+        self.total_rotation = torch.zeros(self.n_agents, device=self.world.device)  # Reset total rotation
+        self.prev_rotations = [agent.state.rot for agent in self.world.agents]  # Reset previous rotations
         for i, goal in enumerate(goals):
             goal.set_pos(
                 self.waypoints[i].point,
@@ -214,6 +218,7 @@ class Scenario(BaseScenario):
             device=self.world.device,
             dtype=torch.float32,
             )
+        # Track whether the agent is currently on a waypoint
         for i, landmark in enumerate(self.world.landmarks):
             if landmark.state.pos is not None and agent.state.pos is not None:
                 if landmark.name.startswith("goal"):
@@ -246,6 +251,29 @@ class Scenario(BaseScenario):
 
         self.total_distance[agent_index] += distance
         self.prev_positions[agent_index] = current_pos
+
+        # Update rotation information
+        current_rot = agent.state.rot
+        prev_rot = self.prev_rotations[agent_index]
+
+        # Find the angular displacement since the last move
+        if prev_rot is not None and current_rot is not None:
+
+            if current_rot.dim() > 0:
+                current_rot = current_rot.squeeze()  # Remove batch dimension 
+            if prev_rot.dim() > 0:
+                prev_rot = prev_rot.squeeze()
+            angular_displacement = current_rot - prev_rot  # Gets change in rotation
+            # Handle if rotation goes from 2π to 0
+            angular_displacement = (angular_displacement + torch.pi) % (2 * torch.pi) - torch.pi
+            # Change angular displacement from radians to degrees
+            # angular_displacement_degrees = angular_displacement * (180 / torch.pi)
+
+            # Add absolute value angular displacement
+            self.total_rotation[agent_index] += torch.abs(angular_displacement)
+
+
+        self.prev_rotations[agent_index] = current_rot
 
         # Get positions of all landmarks in this agent's reference frame
         landmark_rel_poses = []
