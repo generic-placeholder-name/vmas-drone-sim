@@ -41,7 +41,10 @@ envConfig = {
         "bottomRight": scale_coordinate(original_bottom_right)
     },
     "rewardAreas": [
-        [scale_coordinate([181, 7]), scale_coordinate([181, 253]), scale_coordinate([486, 253]), scale_coordinate([486, 7])]
+        [scale_coordinate([0, 0]), 
+         scale_coordinate([original_width, 0]), 
+         scale_coordinate([original_width, original_height]), 
+         scale_coordinate([0, original_height])]
         # [scale_coordinate(coord) for coord in [
         #     [187, 130], [241, 153], [265, 153], [261, 240], [184, 239]
         # ]],
@@ -139,11 +142,15 @@ class Scenario(BaseScenario):
         self.total_rotation = torch.zeros(len(self.world.agents), device=device)  # Track total rotation for each agent
         self.prev_rotations = [agent.state.rot for agent in self.world.agents]  # Track previous rotation for each agent
         # Generate goal (waypoints) points in reward areas
-        for x in torch.arange(0, world_width, self.grid_resolution):
-            for y in torch.arange(0, world_height, self.grid_resolution):
+        print(f"World height: {world_height} \
+              \nWorld width: {world_width}\n")
+        for x in torch.arange(self.grid_resolution/2, world_width, self.grid_resolution):
+            for y in torch.arange(self.grid_resolution/2, world_height, self.grid_resolution):
                 point = [x.item(), y.item()]
+                print(point)
                 for reward_area in self.env_config["rewardAreas"]:
                     if is_point_in_polygon(point, reward_area): # TODO: Check that point not in penalty areas
+                        print("Is in reward area\n")
                         goal = Landmark(
                             name=f"goal {len(self.waypoints)}",
                             collide=False,
