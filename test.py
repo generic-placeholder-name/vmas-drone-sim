@@ -20,7 +20,7 @@ if typing.TYPE_CHECKING:
 # original_bottom_right = [486, 253]
 # Changed to feet x feet of farm, measured from google maps
 original_top_left = [0, 0]
-original_bottom_right = [875, 620]
+original_bottom_right = [800, 620]
 
 original_width = original_bottom_right[0] - original_top_left[0]
 original_height = original_bottom_right[1] - original_top_left[1]
@@ -68,16 +68,28 @@ envConfig = {
         {
             #Second coordinate is subtracted because  value, i.e. 500, was measured from top-left of image, vmas wants it from bottom left
             "topLeft": scale_coordinate([350, 620-500]),  
-            "bottomRight": scale_coordinate([426, 620-400])
+            "bottomRight": scale_coordinate([426, 620-400]),
+            "type": "box"
         },
         {
             "topLeft": scale_coordinate([485, 620-340]),
-            "bottomRight": scale_coordinate([525, 620-242])
+            "bottomRight": scale_coordinate([525, 620-242]),
+            "type": "box"
+        },
+        {
+            "topLeft": scale_coordinate([350, 620-600]),
+            "bottomRight": scale_coordinate([400, 620-550]),
+            "type": "circle",
+        },
+        {
+            "topLeft": scale_coordinate([175, 620-200]),
+            "bottomRight": scale_coordinate([225, 620-150]),
+            "type": "circle",
         }
     ],
     "startingPoints": [
-        scale_coordinate([298, 153]),
-        scale_coordinate([356, 154])
+        scale_coordinate([450, 200]),
+        scale_coordinate([475, 200])
     ]
 }
 
@@ -171,12 +183,19 @@ class Scenario(BaseScenario):
             length = bottom_right[0] - top_left[0]
             width = bottom_right[1] - top_left[1]
             center = [(top_left[0] + bottom_right[0]) / 2, (top_left[1] + bottom_right[1]) / 2]
+            obstacle_shape=Box(length=length*2, width=width*2)
+            if penalty_area["type"]=="circle":
+                radius = length/2
+                obstacle_shape=Sphere(radius)
+            # else:
+            #     obstacle_shape=Box(length=length*2, width=width*2), # Need to multiply by two due to nature of vmas coordinate system
+
 
             obstacle = Landmark(
                 name=f"obstacle {i}",
                 collide=True,  # Penalty areas are collidable
                 movable=False,
-                shape=Box(length=length*2, width=width*2), # Need to multiply by two due to nature of vmas coordinate system
+                shape=obstacle_shape, # Need to multiply by two due to nature of vmas coordinate system
                 color=Color.RED,
                 collision_filter=lambda e: not isinstance(e.shape, Box),
             )
