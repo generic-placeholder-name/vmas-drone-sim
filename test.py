@@ -136,6 +136,11 @@ class Scenario(BaseScenario):
         world = World(batch_dim, device, x_semidim=world_width, y_semidim=world_height)
         self._world = world
         world_dims = torch.Tensor([world_width, world_height])
+        self.cumulative_reward = torch.zeros(
+            self.world.batch_dim,
+            device=self.world.device,
+            dtype=torch.float32,
+        )
 
         # Add agents
         for i in range(self.n_agents):
@@ -239,30 +244,31 @@ class Scenario(BaseScenario):
 
     def reward(self, agent: Agent):
         agent_index = self.get_agent_index(agent)
-        reward = torch.zeros(
-            self.world.batch_dim,
-            device=self.world.device,
-            dtype=torch.float32,
-            )
+        # reward = torch.zeros(
+        #     self.world.batch_dim,
+        #     device=self.world.device,
+        #     dtype=torch.float32,
+        #     )
         # Track whether the agent is currently on a waypoint
         for i, landmark in enumerate(self.world.landmarks):
             if landmark.state.pos is not None and agent.state.pos is not None:
                 if landmark.name.startswith("goal"):
                     # print(i, landmark.state.pos, agent.state.pos, torch.linalg.vector_norm(landmark.state.pos - agent.state.pos), self.reward_radius)
                     if self.world.is_overlapping(agent, landmark) and self.waypoint_visits[agent_index, i] == 0:
-                        reward += 1.0
+                        self.cumulative_reward += 1.0
                         self.waypoint_visits[agent_index, i] += 1
                         print(f"Agent {agent_index} reached waypoint {i}!")
                         print(f"Waypoint visits: {self.waypoint_visits[agent_index]}")
-                        print(f"reward: {reward}")
+                        print(f"reward: {self.cumulative_reward}")
                         print(f"total distance: {self.total_distance[agent_index]}")
                         print("----------------------------")
                 elif self.world.is_overlapping(agent, landmark):
                     if landmark.collides(agent):
-                        reward -= reward + 100.0 # set to -100
+                        self.cumulative_reward -= 100.0 # set to -100
                         print(f"Collision by agent {agent_index}")
+                        print(f"reward: {self.cumulative_reward}")
                         print("----------------------------")
-        return reward
+        return self.cumulative_reward
 
     def observation(self, agent: Agent):
         # Update distance information
