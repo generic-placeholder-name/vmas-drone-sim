@@ -52,9 +52,23 @@ class Graph():
         """Get all edges connected to a waypoint."""
         return [edge for edge in self._edges if edge.node1 == node or edge.node2 == node]
 
-    def get_neighbors(self, node):
+    def get_neighbors(self, node, exclude_traversed=False):
         """Get all neighbors of a waypoint."""
-        return [edge.node1 if edge.node1 != node else edge.node2 for edge in self.get_edges(node)]
+        neighbors = []
+        for edge in self.get_edges(node):
+            if edge.node1 == node:
+                if exclude_traversed and edge.node2.traversed:
+                    continue
+                neighbors.append((edge.node2, edge))
+            elif edge.node2 == node:
+                if exclude_traversed and edge.node1.traversed:
+                    continue
+                neighbors.append((edge.node1, edge))
+        return neighbors
+    
+    def fully_traversed(self):
+        """Check if all waypoints in the graph have been traversed."""
+        return all(waypoint.traversed for waypoint in self._waypoints)
     
     def __str__(self) -> str:
         str = "Graph:\n"
@@ -69,6 +83,7 @@ class Waypoint():
         self._point = point
         self._landmark = landmark
         self._reward_radius = reward_radius
+        self._traversed = False
         assert self._point.shape == (2,), "Point must be a 2D tensor"
         assert self._point.dtype == dtype, f"Point must be a {dtype} tensor"
         assert isinstance(self._landmark, Landmark), "landmark must be an instance of Landmark"
@@ -84,6 +99,15 @@ class Waypoint():
     @property
     def reward_radius(self):
         return self._reward_radius
+    
+    @property
+    def traversed(self):
+        return self._traversed
+    
+    @traversed.setter
+    def traversed(self, value):
+        assert isinstance(value, bool), "traversed must be a boolean"
+        self._traversed = value
     
     def __str__(self) -> str:
         return f"{self.landmark.name}({self._point})"
