@@ -264,7 +264,7 @@ class Scenario(BaseScenario):
                         print("----------------------------")
                 elif self.world.is_overlapping(agent, landmark):
                     if landmark.collides(agent):
-                        self.cumulative_reward -= 100.0 # set to -100
+                        self.cumulative_reward -= self.cumulative_reward
                         print(f"Collision by agent {agent_index}")
                         print(f"reward: {self.cumulative_reward}")
                         print("----------------------------")
