@@ -5,6 +5,7 @@ from typing import List
 from torch import Tensor
 
 _scenario = Scenario()
+_print_log = True
 
 
 class ACO:
@@ -34,35 +35,51 @@ class ACO:
         self.max_pheromone = max_pheromone
         self.min_pheromone = min_pheromone
         self.Q = Q
+
+        self.best_ant = None
         
     def get_optimum_path(self) -> List[Waypoint]:
-        for _ in range(self.max_iterations):
-            self.graph.reset_traversed()
+        if _print_log:
+            print(f"Running {self.algorithm} ACO with {self.num_ants} ants for {self.max_iterations} iterations")
+
+        self.hatch_ants()
+        for i in range(self.max_iterations):
+            if _print_log:
+                print(f"Iteration {i}")
             self.construct_ant_solution()
             self.update_pheromones()
-        return self.best_ant_solution()
-    
-    def best_ant_solution(self) -> List[Waypoint]:
-        return self.get_best_ant().node_solution
+        
+        self.update_best_ant()
+        return self.best_ant.node_solution if self.best_ant is not None else []
 
-    def get_best_ant(self):
-        best_ant = None
+    def update_best_ant(self):
+        top_ant = None
         min_cost = float("inf")
         for ant in self.ants:
             cost = ant.distance_traveled * ant.radians_rotated
             if cost < min_cost:
-                best_ant = ant
+                top_ant = ant
                 min_cost = cost
-        assert best_ant is not None, "Best ant not updated correctly"
-        return best_ant
+        assert top_ant is not None, "Best ant not updated correctly"
+        self.best_ant = top_ant
 
     def construct_ant_solution(self):
-        for _ in range(self.num_ants):
-            ant = Ant(self.graph, self.graph.waypoints[0]) # TODO: ADD WAYPOINT RIGHT NEXT TO THEIR CHARGING STATION TO BE THERE START
+        """
+        Constructs a solution for each ant in the ACO algorithm
+        """
+        for i, ant in enumerate(self.ants):
+            if _print_log:
+                print(f"- Ant {i}")
+            ant.reset()
+            self.graph.reset_traversed()
             is_stuck = False
             while not (self.graph.fully_traversed() or is_stuck):
                 is_stuck = not ant.move_next()
-            self.ants.append(ant)
+
+    def hatch_ants(self):
+        assert len(self.ants) == 0
+        for i in range(self.num_ants):
+            self.ants.append(Ant(self.graph, self.graph.waypoints[0])) # TODO: ADD WAYPOINT RIGHT NEXT TO THEIR CHARGING STATION TO BE THERE START
 
     def update_pheromones(self):
         if self.algorithm == "AS":
@@ -76,7 +93,7 @@ class ACO:
                 added_pheromone = self.Q * heuristic(ant.distance_traveled, ant.radians_rotated)
                 edge.weight = (1 - self.evaporation_rate) * edge.weight + added_pheromone
 
-    def update_pheromones_mmas(self, ):
+    def update_pheromones_mmas(self):
         pass
     
 class Ant:
@@ -89,40 +106,102 @@ class Ant:
             constraints (list): A list of edges that the ant cannot traverse
         """
         self.graph = graph
-        self.current_node = start_node
+        self.start_node = start_node
         self.end_node = end_node
-        self.node_solution = [start_node]
-        self.edge_solution = []
         self.constraints = constraints # list of edges that an ant cannot traverse
+
+        self.current_node = self.start_node
+        self.current_node.traversed = True
+        self.node_solution = [self.start_node]
+        self.edge_solution = []
+        self.distance_traveled = 0
+        self.radians_rotated = 0
+
+    def reset(self):
+        self.current_node = self.start_node
+        self.current_node.traversed = True
+        self.node_solution = [self.start_node]
+        self.edge_solution = []
         self.distance_traveled = 0
         self.radians_rotated = 0
         
     def move_next(self):
+        """
+        Ant moves to the next node in the graph based on the pheromone levels and the heuristic function
+        
+        Returns:
+            bool: True if the ant was able to move to the next node, False if the ant can't move
+            """
+        # Check if there are potential moves
         potential_nodes, potential_paths = self.graph.get_neighbors(self.current_node, exclude_traversed=True)
+        if _print_log:
+            print(f"Current node: {self.current_node}")
+            print(f"Potential nodes: {len(potential_nodes)}")
+            print(f"Potential paths: {len(potential_paths)}")
         if len(potential_nodes) == 0:
             return False
-        path_favorability = []
-        path_costs = [] # [(distance, abs(angle)), ...]
-        previous_edge = self.edge_solution[-1] if len(self.edge_solution) > 0 else None
-        for edge in potential_paths:
-            if previous_edge is None: # check if this works when edge_solution is empty
-                angle = 0
-            else:
-                angle = Elbow(previous_edge, edge).angle()
-            path_favorability.append(edge.weight * heuristic(edge.length, abs(angle)))
-            path_costs.append((edge.length, abs(angle)))
+        
+        # Calculate the favorability of each path
+        path_favorability, path_costs = self.calculate_path_specs(potential_paths)
 
+        # Choose which path to take
         total_favorability = sum(path_favorability)
         probabilities = [favorability/total_favorability for favorability in path_favorability]
-        next_node_index = int(torch.multinomial(Tensor(probabilities), 1).item())
-        self.current_node = potential_nodes[next_node_index]
+        next_node_index = int(torch.multinomial(Tensor(probabilities), 1).item()) # choose the next node based on the probabilities
+        if _print_log:
+            print(f"path favorabilities: {path_favorability}. Total: {total_favorability}")
+            print(f"probabilities: {probabilities}")
+            print(f"next node index: {next_node_index}")
+
+        # Move to the next node
+        self.move_to(potential_nodes[next_node_index], potential_paths[next_node_index], path_costs[next_node_index][0], path_costs[next_node_index][1])
+        return True
+    
+    def move_to(self, node, edge, distance=None, rotation=None):
+        """
+        Moves the ant to the specified node via the specified edge
+        args:
+            node (Waypoint): The node that the ant will move to
+            edge (Edge): The edge that the ant will traverse
+        """
+        assert node in edge.nodes, "Node must be in the edge"
+
+        # Update costs of move
+        if distance is None:
+            distance = edge.length
+        if rotation is None:
+            rotation = self.get_rotation(edge)
+
+        assert distance > 0, "Distance must be greater than 0"
+        self.distance_traveled += distance
+        self.radians_rotated += rotation
+
+        # Move to the next node
+        self.current_node = node
         self.current_node.traversed = True
         self.node_solution.append(self.current_node)
-        self.edge_solution.append(potential_paths[next_node_index])
+        self.edge_solution.append(edge)
+        if _print_log:
+            print(f"Moved to {node}")
+            print(f"Distance traveled: {self.distance_traveled}")
+            print(f"Radians rotated: {self.radians_rotated}")
 
-        assert path_costs[next_node_index][0] > 0, "Distance must be greater than 0"
-        self.distance_traveled += path_costs[next_node_index][0]
-        self.radians_rotated += path_costs[next_node_index][1]
+    def calculate_path_specs(self, potential_paths):
+        path_favorability = []
+        path_costs = [] # [(distance, abs(angle)), ...]
+        for edge in potential_paths:
+            rotation = self.get_rotation(edge)
+            path_favorability.append(edge.weight * heuristic(edge.length, abs(rotation)))
+            path_costs.append((edge.length, rotation))
+        return path_favorability, path_costs
+    
+    def get_rotation(self, edge):
+        previous_edge = self.edge_solution[-1] if len(self.edge_solution) > 0 else None
+        if previous_edge is None:
+            return 0
+        else:
+            assert previous_edge != edge, f"Can't get rotation between the same edges, {previous_edge} and {edge}"
+            return abs(Elbow(previous_edge, edge).angle())
 
 def heuristic(distance, rotation, min_rotation_constant=0.1):
     assert distance > 0, "Distance must be greater than 0"
@@ -132,6 +211,13 @@ def heuristic(distance, rotation, min_rotation_constant=0.1):
     return distance_heuristic * rotation_heuristic
 
 if __name__ == "__main__":
-    aco = ACO(_scenario)
+    aco = ACO(_scenario, num_ants=2, max_iterations=1)
     path = aco.get_optimum_path()
-    print(path)
+    if aco.best_ant is not None:
+        for edge in aco.best_ant.edge_solution:
+            print(edge)
+    for waypoint in path:
+        print(waypoint)
+    if aco.best_ant is not None:
+        print(f"Total distance: {aco.best_ant.distance_traveled}")
+        print(f"Total radians rotated: {aco.best_ant.radians_rotated}")

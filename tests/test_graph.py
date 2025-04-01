@@ -103,8 +103,24 @@ def edge_w2_w3(waypoint2, waypoint3):
 def elbow1(edge_w1_w2, edge_w2_w3):
     return Elbow(edge_w1_w2, edge_w2_w3)
 
+@pytest.fixture
+def elbow1_reverse(edge_w1_w2, edge_w2_w3):
+    return Elbow(edge_w2_w3, edge_w1_w2)
+
 def test_elbow_angle(elbow1, edge_w1_w2, edge_w2_w3, edge_w1_w3):
     assert elbow1.angle() == torch.arccos((edge_w1_w2.length**2 + edge_w2_w3.length**2 - edge_w1_w3.length**2) / (2 * edge_w1_w2.length * edge_w2_w3.length))
+
+def test_reversed_elbows_are_equal(elbow1, elbow1_reverse):
+    assert abs(elbow1.angle()) == abs(elbow1_reverse.angle())
+
+@pytest.fixture
+def edge_w2_w1(waypoint2, waypoint1):
+    return Edge(waypoint2, waypoint1)
+
+def test_elbow_with_same_edges(edge_w1_w2, edge_w2_w1):
+    with pytest.raises(AssertionError, match="The edges must not be the same"):
+        Elbow(edge_w1_w2, edge_w2_w1)
+
 
 #endregion
 
@@ -123,12 +139,12 @@ def graph_with_generated_edges(graph_with_waypoints):
 def test_graph_generate_edges(graph_with_generated_edges):
     assert len(graph_with_generated_edges.edges) == 6
     assert str(graph_with_generated_edges) == ("Graph:" +
-                                               "\nEdge(A(tensor([1., 1.])), B(tensor([2., 3.])))" +
-                                               "\nEdge(A(tensor([1., 1.])), C(tensor([3.0000, 2.5000])))" +
-                                               "\nEdge(A(tensor([1., 1.])), D(tensor([6., 1.])))" +
-                                               "\nEdge(B(tensor([2., 3.])), C(tensor([3.0000, 2.5000])))" +
-                                               "\nEdge(B(tensor([2., 3.])), D(tensor([6., 1.])))" +
-                                               "\nEdge(C(tensor([3.0000, 2.5000])), D(tensor([6., 1.])))\n")
+                                               "\nEdge(A(tensor([1., 1.])), B(tensor([2., 3.]))) (weight: 1.0)" +
+                                               "\nEdge(A(tensor([1., 1.])), C(tensor([3.0000, 2.5000]))) (weight: 1.0)" +
+                                               "\nEdge(A(tensor([1., 1.])), D(tensor([6., 1.]))) (weight: 1.0)" +
+                                               "\nEdge(B(tensor([2., 3.])), C(tensor([3.0000, 2.5000]))) (weight: 1.0)" +
+                                               "\nEdge(B(tensor([2., 3.])), D(tensor([6., 1.]))) (weight: 1.0)" +
+                                               "\nEdge(C(tensor([3.0000, 2.5000])), D(tensor([6., 1.]))) (weight: 1.0)\n")
     
 def test_graph_get_neighbors_untraversed(graph_with_generated_edges, waypoint1, waypoint2, waypoint3, waypoint4):
     node_neighbors, edge_neighbors = graph_with_generated_edges.get_neighbors(waypoint3)
