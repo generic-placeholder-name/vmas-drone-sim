@@ -5,11 +5,11 @@ from typing import List
 from torch import Tensor
 
 _scenario = Scenario()
-_print_log = True
+_print_log = False
 
 
 class ACO:
-    def __init__(self, scenario, num_ants=50, max_iterations=100, algorithm="AS", evaporation_rate=0.5, Q=1, max_pheromone=10, min_pheromone=0) -> None:
+    def __init__(self, waypoints, num_ants=20, max_iterations=100, algorithm="AS", evaporation_rate=0.1, Q=1, max_pheromone=10, min_pheromone=0) -> None:
         """
         Args:
             scenario (Scenario): The scenario that the ACO algorithm will be run on
@@ -21,10 +21,7 @@ class ACO:
             max_pheromone (int): The max amount of pheromone that an edge can have, used for MMAS algorithm
             min_pheromone (int): The min amount of pheromone that an edge can have, used for MMAS algorithm
         """
-        self.scenario = scenario
-        self.scenario.make_world(batch_dim=1, device="cpu")
-        self.scenario.reset_world_at()
-        self.graph = Graph(self.scenario.waypoints)
+        self.graph = Graph(waypoints)
         self.graph.generate_edges()
         self.num_ants = num_ants
         self.max_iterations = max_iterations
@@ -70,8 +67,8 @@ class ACO:
         for i, ant in enumerate(self.ants):
             if _print_log:
                 print(f"- Ant {i}")
-            ant.reset()
             self.graph.reset_traversed()
+            ant.reset()
             is_stuck = False
             while not (self.graph.fully_traversed() or is_stuck):
                 is_stuck = not ant.move_next()
@@ -211,7 +208,9 @@ def heuristic(distance, rotation, min_rotation_constant=0.1):
     return distance_heuristic * rotation_heuristic
 
 if __name__ == "__main__":
-    aco = ACO(_scenario, num_ants=2, max_iterations=1)
+    _scenario.make_world(batch_dim=1, device='cpu') # "cpu" underlined but doesn't cause error
+    _scenario.reset_world_at()
+    aco = ACO(_scenario.waypoints)
     path = aco.get_optimum_path()
     if aco.best_ant is not None:
         for edge in aco.best_ant.edge_solution:

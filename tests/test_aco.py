@@ -1,5 +1,6 @@
 import pytest
 from aco import *
+import graph
 from test_graph import *
 
 def test_heuristic():
@@ -19,7 +20,7 @@ def ant2(graph_with_generated_edges, waypoint1):
 def ant3(graph_with_generated_edges, waypoint1):
     return Ant(graph_with_generated_edges, waypoint1)
 
-def test_get_rotation(ant1, edge_w1_w2, edge_w2_w3):
+def test_ant_get_rotation(ant1, edge_w1_w2, edge_w2_w3):
     assert ant1.get_rotation(edge_w1_w2) == 0
     assert ant1.current_node == edge_w1_w2.node1
     ant1.move_to(edge_w1_w2.node2, edge_w1_w2)
@@ -34,7 +35,7 @@ def edge_w3_w2(waypoint3, waypoint2):
 def edge_w3_w4(waypoint3, waypoint4):
     return Edge(waypoint3, waypoint4)
 
-def test_move_to(ant1, waypoint1, waypoint2, waypoint3, waypoint4, edge_w1_w2, edge_w3_w2, edge_w3_w4):
+def test_ant_move_to(ant1, waypoint1, waypoint2, waypoint3, waypoint4, edge_w1_w2, edge_w3_w2, edge_w3_w4):
     assert ant1.current_node == waypoint1
     assert ant1.node_solution == [waypoint1]
     assert ant1.edge_solution == []
@@ -61,3 +62,11 @@ def test_move_to(ant1, waypoint1, waypoint2, waypoint3, waypoint4, edge_w1_w2, e
     assert ant1.edge_solution == [edge_w1_w2, edge_w3_w2, edge_w3_w4]
     assert ant1.distance_traveled == edge_w1_w2.length + edge_w3_w2.length + edge_w3_w4.length
     assert ant1.radians_rotated == abs(Elbow(edge_w1_w2, edge_w3_w2).angle()) + abs(Elbow(edge_w3_w2, edge_w3_w4).angle())
+
+@pytest.fixture
+def aco(graph_with_generated_edges):
+    return ACO(graph_with_generated_edges.waypoints)
+
+def test_get_optimum_path(aco):
+    pass
+    
