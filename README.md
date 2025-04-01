@@ -38,6 +38,6 @@ A good practice is to create an issue for whatever you want to fix or work on, a
 
 # Run Tests Before Merging to Main
 Make sure that all tests in the tests folder run without failing. To do this, run the following command:
-```
-python -m pytest
 ```console
+python -m pytest
+```
