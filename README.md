@@ -1,6 +1,15 @@
 # Drone Coverage Simmulation in VMAS
 
-# Getting Started as a Contributor
+# Contributor Guidelines
+Before creating a pull request to main...
+1. Make sure that all tests in the tests folder run without failing. To do this, run the following command:
+```console
+python -m pytest
+```
+2. If you added functionality and if there is a way to add automatic unit tests for it, please do so! Reference the tests folder to see how to do this.
+3. Run test.py and interact with the teleop. Make sure it is working as it should. (Control the drone with the arrows and the W,A,S,D keys)
+
+# Tips for collaborating on GitHub
 Helpful video: https://youtu.be/MnUd31TvBoU?si=BMQ1mHRvrJd1we3S
 
 To get started, clone this git repository. Within it, create a [virtual environment](https://realpython.com/python-virtual-environments-a-primer/). Once you're running the virtual environment, install the dependencies found in requirements.txt. For example, if using venv from the mac terminal,
@@ -35,9 +44,3 @@ before merging to main branch.
 ```
 
 A good practice is to create an issue for whatever you want to fix or work on, and then create a branch (from main) to work on that specific issue. Mention the issue number in the commit message and close the issue after you've merged to the main branch. Thoughtful comments are always helpful. Then delete your branch and begin the process again when you're ready to work on a new issue.
-
-# Run Tests Before Merging to Main
-Make sure that all tests in the tests folder run without failing. To do this, run the following command:
-```console
-python -m pytest
-```
