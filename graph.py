@@ -1,12 +1,89 @@
 import torch
 from vmas.simulator.core import Landmark
 
+class Graph():
+    """A Graph represents a collection of waypoints connected by edges."""
+    def __init__(self, waypoints=None, edges=None):
+        """
+        Args:
+            waypoints (list): A list of Waypoints to initialize the graph with.
+            edges (list): A list of Edges to initialize the graph with.
+        """
+        self._waypoints = waypoints if waypoints is not None else []
+        self._edges = edges if edges is not None else []
+
+        assert all(isinstance(waypoint, Waypoint) for waypoint in self._waypoints), "All waypoints must be instances of Waypoint"
+        assert all(isinstance(edge, Edge) for edge in self._edges), "All edges must be instances of Edge"
+
+    @property
+    def waypoints(self):
+        return self._waypoints
+
+    @property
+    def edges(self):
+        return self._edges
+
+    def generate_edges(self):
+        """Generate all possible edges between waypoints."""
+        for i, node1 in enumerate(self._waypoints):
+            for j, node2 in enumerate(self._waypoints):
+                if i != j and self.get_edge(node1, node2) is None:
+                    assert node1 != node2, "repeated waypoints in self._waypoints"
+                    edge = Edge(node1, node2)
+                    self.add_edge(edge)
+
+    def add_waypoint(self, waypoint):
+        assert isinstance(waypoint, Waypoint), "waypoint must be an instance of Waypoint"
+        self._waypoints.append(waypoint)
+
+    def add_edge(self, edge):
+        assert isinstance(edge, Edge), "edge must be an instance of Edge"
+        if self.get_edge(edge.node1, edge.node2) is None:
+            self._edges.append(edge)
+
+    def get_edge(self, node1, node2):
+        """Get an edge by its two connected waypoints."""
+        for edge in self._edges:
+            if (edge.node1 == node1 and edge.node2 == node2) or (edge.node1 == node2 and edge.node2 == node1):
+                return edge
+        return None
+
+    def get_edges(self, node):
+        """Get all edges connected to a waypoint."""
+        return [edge for edge in self._edges if edge.node1 == node or edge.node2 == node]
+
+    def get_neighbors(self, node, exclude_traversed=False):
+        """Get all neighbors of a waypoint."""
+        neighbors = []
+        for edge in self.get_edges(node):
+            if edge.node1 == node:
+                if exclude_traversed and edge.node2.traversed:
+                    continue
+                neighbors.append((edge.node2, edge))
+            elif edge.node2 == node:
+                if exclude_traversed and edge.node1.traversed:
+                    continue
+                neighbors.append((edge.node1, edge))
+        return neighbors
+    
+    def fully_traversed(self):
+        """Check if all waypoints in the graph have been traversed."""
+        return all(waypoint.traversed for waypoint in self._waypoints)
+    
+    def __str__(self) -> str:
+        str = "Graph:\n"
+        for edge in self._edges:
+            str += f"{edge}\n"
+        return str
+    
+
 class Waypoint():
     """A Waypoint represents a point in 2D space with an associated vmas landmark."""
     def __init__(self, point: torch.Tensor, landmark: Landmark, reward_radius=0.01, dtype=torch.float32):
         self._point = point
         self._landmark = landmark
         self._reward_radius = reward_radius
+        self._traversed = False
         assert self._point.shape == (2,), "Point must be a 2D tensor"
         assert self._point.dtype == dtype, f"Point must be a {dtype} tensor"
         assert isinstance(self._landmark, Landmark), "landmark must be an instance of Landmark"
@@ -22,6 +99,18 @@ class Waypoint():
     @property
     def reward_radius(self):
         return self._reward_radius
+    
+    @property
+    def traversed(self):
+        return self._traversed
+    
+    @traversed.setter
+    def traversed(self, value):
+        assert isinstance(value, bool), "traversed must be a boolean"
+        self._traversed = value
+    
+    def __str__(self) -> str:
+        return f"{self.landmark.name}({self._point})"
 
 
 class Edge():
@@ -71,11 +160,11 @@ class Edge():
             self._weight = torch.tensor(0.0, dtype=torch.float32)
 
     @property
-    def _length(self):
+    def length(self):
         return self._length
     
-    @_length.setter
-    def _length(self, value):
+    @length.setter
+    def length(self, value):
         """
         Update the length of the edge, just in case it is different from the estimated length (shortest path).
         This can happen if there is an obstacle between the two waypoints.
@@ -88,6 +177,9 @@ class Edge():
     def estimate_length(self):
         """Estimate the length of the edge based on the distance between the two waypoints."""
         return torch.linalg.vector_norm(self._node2.point - self._node1.point)
+    
+    def __str__(self):
+        return f"Edge({self._node1}, {self._node2})"
 
 class Elbow():
     """An Elbow is a connection between two edges, where the first edge ends at the second edge's start node."""

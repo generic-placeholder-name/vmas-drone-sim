@@ -16,8 +16,11 @@ if typing.TYPE_CHECKING:
 # Coordinates taken from image on Google Docs.
 # Reward areas are areas with crops; penalty areas are the house and the greenhouse
 # Original frame coordinates
-original_top_left = [181, 7]
-original_bottom_right = [486, 253]
+# original_top_left = [181, 7]
+# original_bottom_right = [486, 253]
+# Changed to feet x feet of farm, measured from google maps
+original_top_left = [0, 0]
+original_bottom_right = [800, 620]
 
 original_width = original_bottom_right[0] - original_top_left[0]
 original_height = original_bottom_right[1] - original_top_left[1]
@@ -34,11 +37,14 @@ def scale_coordinate(coord):
 
 envConfig = {
     "borders": {
-        "topLeft": scale_coordinate([181, 7]),
-        "bottomRight": scale_coordinate([486, 253])
+        "topLeft": scale_coordinate(original_top_left),
+        "bottomRight": scale_coordinate(original_bottom_right)
     },
     "rewardAreas": [
-        [scale_coordinate([181, 7]), scale_coordinate([181, 253]), scale_coordinate([486, 253]), scale_coordinate([486, 7])]
+        [scale_coordinate([0, 0]), 
+         scale_coordinate([original_width, 0]), 
+         scale_coordinate([original_width, original_height]), 
+         scale_coordinate([0, original_height])]
         # [scale_coordinate(coord) for coord in [
         #     [187, 130], [241, 153], [265, 153], [261, 240], [184, 239]
         # ]],
@@ -60,17 +66,30 @@ envConfig = {
     ],
     "penaltyAreas": [ 
         {
-            "topLeft": scale_coordinate([365, 100]),
-            "bottomRight": scale_coordinate([378, 137])
+            #Second coordinate is subtracted because  value, i.e. 500, was measured from top-left of image, vmas wants it from bottom left
+            "topLeft": scale_coordinate([350, 620-500]),  
+            "bottomRight": scale_coordinate([426, 620-400]),
+            "type": "box"
         },
         {
-            "topLeft": scale_coordinate([304, 150]),
-            "bottomRight": scale_coordinate([350, 200])
+            "topLeft": scale_coordinate([485, 620-340]),
+            "bottomRight": scale_coordinate([525, 620-242]),
+            "type": "box"
+        },
+        {
+            "topLeft": scale_coordinate([350, 620-600]),
+            "bottomRight": scale_coordinate([400, 620-550]),
+            "type": "circle",
+        },
+        {
+            "topLeft": scale_coordinate([175, 620-200]),
+            "bottomRight": scale_coordinate([225, 620-150]),
+            "type": "circle",
         }
     ],
     "startingPoints": [
-        scale_coordinate([298, 153]),
-        scale_coordinate([356, 154])
+        scale_coordinate([450, 200]),
+        scale_coordinate([475, 200])
     ]
 }
 
@@ -112,11 +131,16 @@ class Scenario(BaseScenario):
         self.waypoints = []
         self.obs_pos = []
         self.agent_start_pos = []
-
+        self.last_waypoint = {i: None for i in range(self.n_agents)}
         # Make world
         world = World(batch_dim, device, x_semidim=world_width, y_semidim=world_height)
         self._world = world
         world_dims = torch.Tensor([world_width, world_height])
+        self.cumulative_reward = torch.zeros(
+            self.world.batch_dim,
+            device=self.world.device,
+            dtype=torch.float32,
+        )
 
         # Add agents
         for i in range(self.n_agents):
@@ -131,7 +155,10 @@ class Scenario(BaseScenario):
             )
             world.add_agent(agent)
             self.agent_start_pos.append(torch.Tensor(self.env_config["startingPoints"][i], device=device) * 2 - world_dims)
-
+            
+        self.total_rotation = torch.zeros(len(self.world.agents), device=device)  # Track total rotation for each agent
+        self.prev_rotations = [agent.state.rot for agent in self.world.agents]  # Track previous rotation for each agent
+      
         for (x, y) in self.agent_start_pos:
             point = torch.Tensor([x.item(), y.item()], device=device)
             goal = Landmark(
@@ -145,11 +172,15 @@ class Scenario(BaseScenario):
             self.waypoints.append(Waypoint(point, goal, reward_radius=self.reward_radius))
 
         # Generate goal (waypoints) points in reward areas
-        for x in torch.arange(0, world_width, self.grid_resolution):
-            for y in torch.arange(0, world_height, self.grid_resolution):
+        print(f"World height: {world_height} \
+              \nWorld width: {world_width}\n")
+        for x in torch.arange(self.grid_resolution/2, world_width, self.grid_resolution):
+            for y in torch.arange(self.grid_resolution/2, world_height, self.grid_resolution):
                 point = [x.item(), y.item()]
+                print(point)
                 for reward_area in self.env_config["rewardAreas"]:
                     if is_point_in_polygon(point, reward_area): # TODO: Check that point not in penalty areas
+                        print("Is in reward area\n")
                         goal = Landmark(
                             name=f"goal {len(self.waypoints)}",
                             collide=False,
@@ -162,7 +193,7 @@ class Scenario(BaseScenario):
                         self.waypoints.append(Waypoint(scaled_point, goal, reward_radius=self.reward_radius))
                         break
         self.waypoint_visits = torch.zeros([self.n_agents, len(self.waypoints)], device=device)  # Track waypoints visited by each drone
-
+        
         # Add penalty areas as landmarks
         for i, penalty_area in enumerate(self.env_config["penaltyAreas"]):
             top_left = penalty_area["topLeft"]
@@ -170,12 +201,19 @@ class Scenario(BaseScenario):
             length = bottom_right[0] - top_left[0]
             width = bottom_right[1] - top_left[1]
             center = [(top_left[0] + bottom_right[0]) / 2, (top_left[1] + bottom_right[1]) / 2]
+            obstacle_shape=Box(length=length*2, width=width*2)
+            if penalty_area["type"]=="circle":
+                radius = length/2
+                obstacle_shape=Sphere(radius)
+            # else:
+            #     obstacle_shape=Box(length=length*2, width=width*2), # Need to multiply by two due to nature of vmas coordinate system
+
 
             obstacle = Landmark(
                 name=f"obstacle {i}",
                 collide=True,  # Penalty areas are collidable
                 movable=False,
-                shape=Box(length=length, width=width),
+                shape=obstacle_shape, # Need to multiply by two due to nature of vmas coordinate system
                 color=Color.RED,
                 collision_filter=lambda e: not isinstance(e.shape, Box),
             )
@@ -196,6 +234,8 @@ class Scenario(BaseScenario):
         obstacles = [self.world.landmarks[n_goals :][i] for i in order]
         self.waypoint_visits = torch.zeros([self.n_agents, len(self.waypoints)], device=self.world.device) # reset the counter
         self.total_distance = torch.tensor([0.0 for _ in self.world.agents])
+        self.total_rotation = torch.zeros(self.n_agents, device=self.world.device)  # Reset total rotation
+        self.prev_rotations = [agent.state.rot for agent in self.world.agents]  # Reset previous rotations
         for i, goal in enumerate(goals):
             goal.set_pos(
                 self.waypoints[i].point,
@@ -217,29 +257,31 @@ class Scenario(BaseScenario):
 
     def reward(self, agent: Agent):
         agent_index = self.get_agent_index(agent)
-        reward = torch.zeros(
-            self.world.batch_dim,
-            device=self.world.device,
-            dtype=torch.float32,
-            )
+        # reward = torch.zeros(
+        #     self.world.batch_dim,
+        #     device=self.world.device,
+        #     dtype=torch.float32,
+        #     )
+        # Track whether the agent is currently on a waypoint
         for i, landmark in enumerate(self.world.landmarks):
             if landmark.state.pos is not None and agent.state.pos is not None:
                 if landmark.name.startswith("goal"):
                     # print(i, landmark.state.pos, agent.state.pos, torch.linalg.vector_norm(landmark.state.pos - agent.state.pos), self.reward_radius)
                     if self.world.is_overlapping(agent, landmark) and self.waypoint_visits[agent_index, i] == 0:
-                        reward += 1.0
+                        self.cumulative_reward += 1.0
                         self.waypoint_visits[agent_index, i] += 1
                         print(f"Agent {agent_index} reached waypoint {i}!")
                         print(f"Waypoint visits: {self.waypoint_visits[agent_index]}")
-                        print(f"reward: {reward}")
+                        print(f"reward: {self.cumulative_reward}")
                         print(f"total distance: {self.total_distance[agent_index]}")
                         print("----------------------------")
                 elif self.world.is_overlapping(agent, landmark):
                     if landmark.collides(agent):
-                        reward -= reward + 100.0 # set to -100
+                        self.cumulative_reward -= self.cumulative_reward
                         print(f"Collision by agent {agent_index}")
+                        print(f"reward: {self.cumulative_reward}")
                         print("----------------------------")
-        return reward
+        return self.cumulative_reward
 
     def observation(self, agent: Agent):
         # Update distance information
@@ -254,6 +296,29 @@ class Scenario(BaseScenario):
 
         self.total_distance[agent_index] += distance
         self.prev_positions[agent_index] = current_pos
+
+        # Update rotation information
+        current_rot = agent.state.rot
+        prev_rot = self.prev_rotations[agent_index]
+
+        # Find the angular displacement since the last move
+        if prev_rot is not None and current_rot is not None:
+
+            if current_rot.dim() > 0:
+                current_rot = current_rot.squeeze()  # Remove batch dimension 
+            if prev_rot.dim() > 0:
+                prev_rot = prev_rot.squeeze()
+            angular_displacement = current_rot - prev_rot  # Gets change in rotation
+            # Handle if rotation goes from 2π to 0
+            angular_displacement = (angular_displacement + torch.pi) % (2 * torch.pi) - torch.pi
+            # Change angular displacement from radians to degrees
+            # angular_displacement_degrees = angular_displacement * (180 / torch.pi)
+
+            # Add absolute value angular displacement
+            self.total_rotation[agent_index] += torch.abs(angular_displacement)
+
+
+        self.prev_rotations[agent_index] = current_rot
 
         # Get positions of all landmarks in this agent's reference frame
         landmark_rel_poses = []
