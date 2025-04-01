@@ -43,8 +43,9 @@ class Graph():
 
     def get_edge(self, node1, node2):
         """Get an edge by its two connected waypoints."""
+        temp_edge = Edge(node1, node2)
         for edge in self._edges:
-            if (edge.node1 == node1 and edge.node2 == node2) or (edge.node1 == node2 and edge.node2 == node1):
+            if edge == temp_edge:
                 return edge
         return None
 
@@ -54,21 +55,27 @@ class Graph():
 
     def get_neighbors(self, node, exclude_traversed=False):
         """Get all neighbors of a waypoint."""
-        neighbors = []
+        node_neighbors = []
+        edge_neighbors = []
         for edge in self.get_edges(node):
             if edge.node1 == node:
-                if exclude_traversed and edge.node2.traversed:
-                    continue
-                neighbors.append((edge.node2, edge))
+                if not (exclude_traversed and edge.node2.traversed):
+                    node_neighbors.append(edge.node2)
+                    edge_neighbors.append(edge)
             elif edge.node2 == node:
-                if exclude_traversed and edge.node1.traversed:
-                    continue
-                neighbors.append((edge.node1, edge))
-        return neighbors
+                if not (exclude_traversed and edge.node1.traversed):
+                    node_neighbors.append(edge.node1)
+                    edge_neighbors.append(edge)
+        return node_neighbors, edge_neighbors
     
     def fully_traversed(self):
         """Check if all waypoints in the graph have been traversed."""
         return all(waypoint.traversed for waypoint in self._waypoints)
+    
+    def reset_traversed(self):
+        """Set all waypoints in the graph as not traversed."""
+        for waypoint in self._waypoints:
+            waypoint.traversed = False
     
     def __str__(self) -> str:
         str = "Graph:\n"
@@ -146,6 +153,10 @@ class Edge():
         return self._node2
     
     @property
+    def nodes(self):
+        return self._node1, self._node2
+    
+    @property
     def weight(self):
         return self._weight
     
@@ -179,11 +190,14 @@ class Edge():
         return torch.linalg.vector_norm(self._node2.point - self._node1.point)
     
     def __str__(self):
-        return f"Edge({self._node1}, {self._node2})"
+        return f"Edge({self._node1}, {self._node2}) (weight: {self.weight})"
+    
+    def __eq__(self, other):
+        return (self.node1 == other.node1 and self.node2 == other.node2) or (self.node1 == other.node2 and self.node2 == other.node1)
 
 class Elbow():
     """An Elbow is a connection between two edges, where the first edge ends at the second edge's start node."""
-    def __init__(self, edge: Edge, previous_edge: Edge, weight=1.0):
+    def __init__(self, previous_edge: Edge, edge: Edge, weight=1.0):
         """
         Args:
             edge (Edge): The current edge between the current waypoint and target waypoint being considered.
@@ -196,9 +210,8 @@ class Elbow():
 
         assert isinstance(edge, Edge), "edge must be an instance of Edge"
         assert isinstance(previous_edge, Edge), "previous_edge must be an instance of Edge"
-        assert edge._node1 == previous_edge._node2, "The edges must be connected"
-        assert edge._node2 != previous_edge._node1, "The edges must not be the same"
-        assert edge._node2.landmark != previous_edge._node1.landmark, "The edges must have different landmarks"
+        assert get_node_in_common(previous_edge, edge) is not None, "The edges must be connected"
+        assert previous_edge != edge, "The edges must not be the same"
         assert self._weight > 0, "Weight must be positive"
 
     @property
@@ -236,3 +249,12 @@ class Elbow():
         # Calculate the angle using the dot product
         cos_theta = torch.dot(dir1, dir2)
         return torch.acos(torch.clamp(cos_theta, -1.0, 1.0))
+
+def get_node_in_common(edge1, edge2):
+    """Get the node in common between two edges."""
+    if edge1.node1 == edge2.node1 or edge1.node1 == edge2.node2:
+        return edge1.node1
+    elif edge1.node2 == edge2.node1 or edge1.node2 == edge2.node2:
+        return edge1.node2
+    else:
+        return None

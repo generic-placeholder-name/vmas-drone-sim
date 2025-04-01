@@ -1,6 +1,19 @@
 # Drone Coverage Simmulation in VMAS
 
-# Getting Started as a Contributor
+Run `test.py` to fly the drones with teleop, using the arrow and W,A,S,D keys.
+
+Run `aco.py` to generate an ordered list of waypoints where the total distance traveled and amount of turns is minimized.
+
+# Contributor Guidelines
+Before creating a pull request to main...
+1. Make sure that all tests in the tests folder run without failing. To do this, run the following command:
+```console
+python -m pytest
+```
+2. If you added functionality and if there is a way to add automatic unit tests for it, please do so! Reference the tests folder to see how to do this.
+3. Run test.py and interact with the teleop. Make sure it is working as it should. (Control the drone with the arrows and the W,A,S,D keys)
+
+# Tips for collaborating on GitHub
 Helpful video: https://youtu.be/MnUd31TvBoU?si=BMQ1mHRvrJd1we3S
 
 To get started, clone this git repository. Within it, create a [virtual environment](https://realpython.com/python-virtual-environments-a-primer/). Once you're running the virtual environment, install the dependencies found in requirements.txt. For example, if using venv from the mac terminal,
