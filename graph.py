@@ -54,21 +54,29 @@ class Graph():
 
     def get_neighbors(self, node, exclude_traversed=False):
         """Get all neighbors of a waypoint."""
-        neighbors = []
+        node_neighbors = []
+        edge_neighbors = []
         for edge in self.get_edges(node):
             if edge.node1 == node:
                 if exclude_traversed and edge.node2.traversed:
                     continue
-                neighbors.append((edge.node2, edge))
+                node_neighbors.append(edge.node2)
+                edge_neighbors.append(edge)
             elif edge.node2 == node:
                 if exclude_traversed and edge.node1.traversed:
                     continue
-                neighbors.append((edge.node1, edge))
-        return neighbors
+                node_neighbors.append(edge.node1)
+                edge_neighbors.append(edge)
+        return node_neighbors, edge_neighbors
     
     def fully_traversed(self):
         """Check if all waypoints in the graph have been traversed."""
         return all(waypoint.traversed for waypoint in self._waypoints)
+    
+    def reset_traversed(self):
+        """Set all waypoints in the graph as not traversed."""
+        for waypoint in self._waypoints:
+            waypoint.traversed = False
     
     def __str__(self) -> str:
         str = "Graph:\n"
@@ -146,6 +154,10 @@ class Edge():
         return self._node2
     
     @property
+    def nodes(self):
+        return self._node1, self._node2
+    
+    @property
     def weight(self):
         return self._weight
     
@@ -183,7 +195,7 @@ class Edge():
 
 class Elbow():
     """An Elbow is a connection between two edges, where the first edge ends at the second edge's start node."""
-    def __init__(self, edge: Edge, previous_edge: Edge, weight=1.0):
+    def __init__(self, previous_edge: Edge, edge: Edge, weight=1.0):
         """
         Args:
             edge (Edge): The current edge between the current waypoint and target waypoint being considered.

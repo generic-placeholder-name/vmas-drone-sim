@@ -35,3 +35,9 @@ before merging to main branch.
 ```
 
 A good practice is to create an issue for whatever you want to fix or work on, and then create a branch (from main) to work on that specific issue. Mention the issue number in the commit message and close the issue after you've merged to the main branch. Thoughtful comments are always helpful. Then delete your branch and begin the process again when you're ready to work on a new issue.
+
+# Run Tests Before Merging to Main
+Make sure that all tests in the tests folder run without failing. To do this, run the following command:
+```
+python -m pytest
+```console
