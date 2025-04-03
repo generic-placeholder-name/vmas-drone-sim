@@ -82,13 +82,13 @@ class Graph():
         if edges is not None and waypoints is not None:
             raise ValueError("Both edges and waypoints were provided when only one of them should be.")
         elif edges is not None:
-            return self.get_cost_from_edges_path(edges)
+            return self.get_cost_from_edges_tour(edges)
         elif waypoints is not None:
-            return self.get_cost_from_edges_path(self.get_edges_from_waypoint_path(waypoints))
+            return self.get_cost_from_edges_tour(self.get_edges_from_waypoint_tour(waypoints))
         else:
             raise ValueError("edges or (exclusive) waypoints must be provided.")
         
-    def get_edges_from_waypoint_path(self, waypoints):
+    def get_edges_from_waypoint_tour(self, waypoints):
         """Returns the equivalent waypoint path expressed in edges"""
         edges = []
         previous_waypoint_index = 0
@@ -96,9 +96,10 @@ class Graph():
             edge = self.get_edge(waypoints[previous_waypoint_index], waypoints[i])
             assert edge is not None, f"Invalid path. No edge connects waypoints {waypoints[previous_waypoint_index]} and {waypoints[i]}"
             edges.append(edge)
+            previous_waypoint_index = i
         return edges
 
-    def get_cost_from_edges_path(self, edges):
+    def get_cost_from_edges_tour(self, edges):
         """Returns the total costs from traversing edges path (distance, rotation)"""
         previous_edge = None
         distance = 0
@@ -116,7 +117,7 @@ class Graph():
             return 0
         else:
             assert previous_edge != edge, f"Can't get rotation between the same edges, {previous_edge} and {edge}"
-            return abs(Elbow(previous_edge, edge).angle())
+            return Elbow(previous_edge, edge).angle()
 
     def __str__(self) -> str:
         str = "Graph:\n"

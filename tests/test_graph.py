@@ -100,6 +100,10 @@ def edge_w2_w3(waypoint2, waypoint3):
     return Edge(waypoint2, waypoint3)
 
 @pytest.fixture
+def edge_w3_w4(waypoint3, waypoint4):
+    return Edge(waypoint3, waypoint4)
+
+@pytest.fixture
 def elbow1(edge_w1_w2, edge_w2_w3):
     return Elbow(edge_w1_w2, edge_w2_w3)
 
@@ -191,5 +195,20 @@ def test_graph_reset_traversed(graph_with_generated_edges, waypoint1, waypoint2,
     assert not waypoint2.traversed
     assert not waypoint3.traversed
     assert not waypoint4.traversed
-    
+
+def test_get_edges_from_waypoint_tour(graph_with_generated_edges,
+                                      waypoint1,
+                                      waypoint2,
+                                      waypoint3,
+                                      waypoint4,
+                                      edge_w1_w2,
+                                      edge_w2_w3,
+                                      edge_w3_w4,
+                                      ):
+    waypoint_tour = [waypoint1, waypoint2, waypoint3, waypoint4]
+    edge_tour = graph_with_generated_edges.get_edges_from_waypoint_tour(waypoint_tour)
+    assert len(waypoint_tour) == len(edge_tour) + 1
+    assert edge_tour[0] == edge_w1_w2, f"expected: {edge_w1_w2}, actual: {edge_tour[0]}"
+    assert edge_tour[1] == edge_w2_w3, f"expected: {edge_w2_w3}, actual: {edge_tour[1]}"
+    assert edge_tour[2] == edge_w3_w4, f"expected: {edge_w3_w4}, actual: {edge_tour[2]}"
 #endregion

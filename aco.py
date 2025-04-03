@@ -8,7 +8,7 @@ _scenario = Scenario()
 _print_log = False
 
 class ACO:
-    def __init__(self, waypoints, num_ants=20, max_iterations=100, algorithm="AS", evaporation_rate=0.1, Q=1, max_pheromone=10, min_pheromone=0) -> None:
+    def __init__(self, waypoints, num_ants=20, max_iterations=100, algorithm="AS", evaporation_rate=0.05, Q=1, max_pheromone=10, min_pheromone=0) -> None:
         """
         Args:
             scenario (Scenario): The scenario that the ACO algorithm will be run on
@@ -45,9 +45,9 @@ class ACO:
             if _print_log:
                 print(f"Iteration {i}")
             self.construct_ant_solution()
+            self.update_best_tour()
             self.update_pheromones()
-        
-        self.update_best_tour()
+
         return self.best_ant_current.node_solution if self.best_ant_current is not None else []
 
     def update_best_tour(self):
@@ -61,6 +61,7 @@ class ACO:
                 continue
             
             # Check if ant is top performing in this iteration
+            assert ant.total_distance > 0, f"Expected ant's total distance to be greater than zero. Actual: {ant.total_distance}."
             performance = heuristic(ant.total_distance, ant.total_rotation)
             if performance > best_performance:
                 top_ant = ant
@@ -74,10 +75,11 @@ class ACO:
             return
         
         # Update best tours if best ant this iteration was the best-so-far
-        if self.best_tour_edges is None:
+        if self.best_tour_edges == []:
             self.set_best_tour(top_ant.node_solution, top_ant.edge_solution)
             return
         best_tour_distance, best_tour_rotation = self.graph.get_path_costs(self.best_tour_edges)
+        assert best_tour_distance > 0, f"Expect best tour distance to be greater than zero. Actual: {best_tour_distance}"
         if heuristic(top_ant.total_distance, top_ant.total_rotation) > heuristic(best_tour_distance, best_tour_rotation):
             self.set_best_tour(top_ant.node_solution, top_ant.edge_solution)
 
@@ -110,6 +112,8 @@ class ACO:
             self.update_pheromones_as()
         elif self.algorithm == "MMAS":
             self.update_pheromones_mmas()
+        else:
+            raise ValueError(f"Expected algorithm to be 'AS' or 'MMAS'. Actual: {self.algorithm}")
 
     def evaporate(self):
         """Evaporation (reduction) of pheroone on all edges"""
@@ -205,7 +209,6 @@ class Ant:
             distance = edge.length
         if rotation is None:
             rotation = self.get_rotation(edge)
-        breakpoint()
         assert distance > 0, "Distance must be greater than 0"
         self.total_distance += distance
         self.total_rotation += rotation
@@ -227,6 +230,7 @@ class Ant:
         edge_favorabilities = []
         edge_costs = [] # [(distance, abs(angle)), ...]
         for edge in potential_edges:
+            assert edge.length > 0, f"expected edge to be greater than zero. Actual: {edge.length}"
             edge_favorabilities.append(self.calculate_favorability(edge))
             edge_costs.append((edge.length, self.get_rotation(edge)))
         return edge_favorabilities, edge_costs
@@ -236,24 +240,24 @@ class Ant:
     
     def get_rotation(self, edge):
         previous_edge = self.edge_solution[-1] if len(self.edge_solution) > 0 else None
-        return self.graph.get_rotation(previous_edge, edge)
-
+        return abs(self.graph.get_rotation(previous_edge, edge))
 
 def heuristic(distance, rotation, min_rotation_constant=0.1):
     """Returns (1/distance) * (1/rotation), assuming some degree of rotation to prevent division by zero"""
-    assert distance > 0, "Distance must be greater than 0"
+    assert distance > 0, f"Distance must be greater than 0. Actual: {distance}"
     assert rotation >= 0, "Rotation cannot be negative"
     distance_heuristic = 1/distance
     rotation_heuristic = 1/max(rotation, min_rotation_constant)
     return distance_heuristic * rotation_heuristic
 
 def bound(value, min_bound, max_bound):
-    max(min(max_bound, edge.weight + value), min_bound)
+    assert min_bound < max_bound, "minimum bound must be less than maximum bound"
+    return max(min(max_bound, value), min_bound)
 
 if __name__ == "__main__":
     _scenario.make_world(batch_dim=1, device='cpu') # "cpu" underlined but doesn't cause error
     _scenario.reset_world_at()
-    aco = ACO(_scenario.waypoints, 5, 1)
+    aco = ACO(_scenario.waypoints, 20, 30, "MMAS")
     path = aco.get_optimum_tour()
     if aco.best_ant_current is not None:
         for edge in aco.best_ant_current.edge_solution:

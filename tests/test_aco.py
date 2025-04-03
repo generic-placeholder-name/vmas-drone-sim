@@ -70,3 +70,9 @@ def aco(graph_with_generated_edges):
 def test_get_optimum_path(aco):
     pass
     
+def test_bound():
+    assert bound(5, 2, 6) == 5
+    assert bound(5, 2, 5) == 5
+    assert bound(2, 2, 5) == 2
+    assert bound(2, 3, 6) == 3
+    assert bound(8, 4, 6) == 6
