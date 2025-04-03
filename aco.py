@@ -8,7 +8,7 @@ _scenario = Scenario()
 _print_log = False
 
 class ACO:
-    def __init__(self, waypoints, num_ants=20, max_iterations=100, algorithm="AS", evaporation_rate=0.05, Q=1, max_pheromone=10, min_pheromone=0) -> None:
+    def __init__(self, waypoints, num_ants=20, max_iterations=100, algorithm="AS", evaporation_rate=0.5, Q=1, max_pheromone=10, min_pheromone=0) -> None:
         """
         Args:
             scenario (Scenario): The scenario that the ACO algorithm will be run on
@@ -35,6 +35,8 @@ class ACO:
         self.best_ant_current = None # Ant with best tour in iteration
         self.best_tour_nodes = [] # Best tour so far, specified by nodes (in all iterations)
         self.best_tour_edges = [] # Best tour so far, specified by edges (in all iterations)
+        self.best_tour_distance = None
+        self.best_tour_rotation = None
         
     def get_optimum_tour(self) -> List[Waypoint]:
         if _print_log:
@@ -48,7 +50,7 @@ class ACO:
             self.update_best_tour()
             self.update_pheromones()
 
-        return self.best_ant_current.node_solution if self.best_ant_current is not None else []
+        return self.best_tour_nodes
 
     def update_best_tour(self):
         """Update the best tours across all iterations, and also the best ant in the latest iteration"""
@@ -76,17 +78,18 @@ class ACO:
         
         # Update best tours if best ant this iteration was the best-so-far
         if self.best_tour_edges == []:
-            self.set_best_tour(top_ant.node_solution, top_ant.edge_solution)
+            self.set_best_tour(top_ant.node_solution, top_ant.edge_solution, top_ant.total_distance, top_ant.total_rotation)
             return
         best_tour_distance, best_tour_rotation = self.graph.get_path_costs(self.best_tour_edges)
-        assert best_tour_distance > 0, f"Expect best tour distance to be greater than zero. Actual: {best_tour_distance}"
         if heuristic(top_ant.total_distance, top_ant.total_rotation) > heuristic(best_tour_distance, best_tour_rotation):
-            self.set_best_tour(top_ant.node_solution, top_ant.edge_solution)
+            self.set_best_tour(top_ant.node_solution, top_ant.edge_solution, top_ant.total_distance, top_ant.total_rotation)
 
-    def set_best_tour(self, tour_nodes, tour_edges):
+    def set_best_tour(self, tour_nodes, tour_edges, distance, rotation):
         """Set the best tour across all iterations"""
         self.best_tour_nodes = tour_nodes
         self.best_tour_edges = tour_edges
+        self.best_tour_distance = distance
+        self.best_tour_rotation = rotation
 
     def construct_ant_solution(self):
         """
@@ -109,9 +112,9 @@ class ACO:
     def update_pheromones(self):
         self.evaporate()
         if self.algorithm == "AS":
-            self.update_pheromones_as()
+            self.deposit_pheromones_as()
         elif self.algorithm == "MMAS":
-            self.update_pheromones_mmas()
+            self.deposit_pheromones_mmas()
         else:
             raise ValueError(f"Expected algorithm to be 'AS' or 'MMAS'. Actual: {self.algorithm}")
 
@@ -120,19 +123,31 @@ class ACO:
         for edge in self.graph.edges:
             edge.weight *= (1 - self.evaporation_rate) # tau = (1 - rho) * tau
 
-    def update_pheromones_as(self):
+    def deposit_pheromones_as(self):
         """All ants deposit pheromones on traversed edges, following Ant System procedure"""
         for ant in self.ants:
             for edge in ant.edge_solution:
                 edge.weight += self.Q * heuristic(ant.total_distance, ant.total_rotation) # Q * (1/L) * (1/theta)
 
-    def update_pheromones_mmas(self):
+    def deposit_pheromones_mmas(self, all_time=False):
         """The best ant deposits pheromones on traversed edges, following Max-Min Ant System"""
-        assert self.best_ant_current is not None, "A best ant has not been declared" #TODO: Make sure each iteration one is declared
-        for edge in self.best_ant_current.edge_solution:
-            added_pheromone = heuristic(self.best_ant_current.total_distance, self.best_ant_current.total_rotation) # (1/L_best) * (1/theta_best)
+        assert self.best_ant_current is not None, "A best ant has not been set"
+        edge_tour = None
+        node_tour = None
+        if all_time:
+            edge_tour = self.best_tour_edges
+            node_tour = self.best_tour_nodes
+        else:
+            edge_tour = self.best_ant_current.edge_solution
+            node_tour = self.best_ant_current.node_solution
+
+        assert edge_tour != [], "A best tour has not been declared"
+        assert len(edge_tour) + 1 == len(node_tour), "Incorrect number of edges in best tour."
+        distance, rotation = self.graph.get_cost_from_edges_tour(edge_tour)
+        for edge in edge_tour:
+            added_pheromone = heuristic(distance, rotation) # (1/L_best) * (1/theta_best)
             edge.weight = bound(edge.weight + added_pheromone, self.min_pheromone, self.max_pheromone)
-    
+
 
 class Ant:
     def __init__(self, graph, start_node, end_node=None, constraints=[]) -> None:
@@ -259,11 +274,22 @@ if __name__ == "__main__":
     _scenario.reset_world_at()
     aco = ACO(_scenario.waypoints, 20, 30, "MMAS")
     path = aco.get_optimum_tour()
-    if aco.best_ant_current is not None:
-        for edge in aco.best_ant_current.edge_solution:
+    if aco.best_tour_edges is not None:
+        for edge in aco.best_tour_edges:
             print(edge)
     for waypoint in path:
         print(waypoint)
+
+    print("\nall time best solution:\n") # TODO: all time is performing worse than the most recent, which isn't right. Look into this.
+    print(f"Total distance: {aco.best_tour_distance}")
+    print(f"Total radians rotated: {aco.best_tour_rotation}")
+    print(f"Performance: {heuristic(aco.best_tour_distance, aco.best_tour_rotation)}")
+    print(f"Number of waypoints visited: {len(aco.best_tour_nodes)} out of {len(aco.graph.waypoints)}")
+
+    print("\ncurrent best ant:\n")
     if aco.best_ant_current is not None:
         print(f"Total distance: {aco.best_ant_current.total_distance}")
         print(f"Total radians rotated: {aco.best_ant_current.total_rotation}")
+        print(f"Performance: {heuristic(aco.best_ant_current.total_distance, aco.best_ant_current.total_rotation)}")
+        print(f"Number of waypoints visited: {len(aco.best_ant_current.node_solution)} out of {len(aco.graph.waypoints)}")
+    
