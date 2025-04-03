@@ -155,10 +155,23 @@ class Scenario(BaseScenario):
             )
             world.add_agent(agent)
             self.agent_start_pos.append(torch.Tensor(self.env_config["startingPoints"][i], device=device) * 2 - world_dims)
-        
+            
         self.total_rotation = torch.zeros(len(self.world.agents), device=device)  # Track total rotation for each agent
         self.prev_rotations = [agent.state.rot for agent in self.world.agents]  # Track previous rotation for each agent
-        
+      
+        for (x, y) in self.agent_start_pos:
+            point = torch.Tensor([x.item(), y.item()], device=device)
+            goal = Landmark(
+                name=f"goal {len(self.waypoints)}",
+                collide=False,
+                shape=Sphere(radius=self.reward_radius),
+                color=Color.LIGHT_GREEN,
+            )
+            # if agent in point
+            world.add_landmark(goal)
+            self.waypoints.append(Waypoint(point, goal, reward_radius=self.reward_radius))
+
+        # Generate goal (waypoints) points in reward areas
         print(f"World height: {world_height} \
               \nWorld width: {world_width}\n")
         
