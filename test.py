@@ -178,6 +178,7 @@ class Scenario(BaseScenario):
                         world.add_landmark(goal)
                         scaled_point = torch.Tensor(point, device=device) * 2 - world_dims
                         self.waypoints.append(Waypoint(scaled_point, goal, reward_radius=self.reward_radius))
+                        print(f"Waypoint {len(self.waypoints)-1} created at {point}")
                         break
         self.waypoint_visits = torch.zeros([self.n_agents, len(self.waypoints)], device=device)  # Track waypoints visited by each drone
         

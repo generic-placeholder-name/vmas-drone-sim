@@ -210,8 +210,9 @@ if __name__ == "__main__":
     _scenario.make_world(batch_dim=1, device='cpu') # "cpu" underlined but doesn't cause error
     _scenario.reset_world_at()
     graph = Graph(_scenario.waypoints)
-    graph.generate_edges() ## graph.remove_edges(list_of_edges)
-    aco = ACO(graph, max_iterations=20)
+    graph.generate_edges()
+    graph.remove_edges(graph.edges)
+    aco = ACO(graph)
     path = aco.get_optimum_path()
     if aco.best_ant is not None:
         for edge in aco.best_ant.edge_solution:
