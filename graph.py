@@ -76,7 +76,48 @@ class Graph():
         """Set all waypoints in the graph as not traversed."""
         for waypoint in self._waypoints:
             waypoint.traversed = False
-    
+
+    def get_path_costs(self, edges=None, waypoints=None):
+        """Returns total distance and total rotations of a path"""
+        if edges is not None and waypoints is not None:
+            raise ValueError("Both edges and waypoints were provided when only one of them should be.")
+        elif edges is not None:
+            return self.get_cost_from_edges_path(edges)
+        elif waypoints is not None:
+            return self.get_cost_from_edges_path(self.get_edges_from_waypoint_path(waypoints))
+        else:
+            raise ValueError("edges or (exclusive) waypoints must be provided.")
+        
+    def get_edges_from_waypoint_path(self, waypoints):
+        """Returns the equivalent waypoint path expressed in edges"""
+        edges = []
+        previous_waypoint_index = 0
+        for i in range(1, len(waypoints)):
+            edge = self.get_edge(waypoints[previous_waypoint_index], waypoints[i])
+            assert edge is not None, f"Invalid path. No edge connects waypoints {waypoints[previous_waypoint_index]} and {waypoints[i]}"
+            edges.append(edge)
+        return edges
+
+    def get_cost_from_edges_path(self, edges):
+        """Returns the total costs from traversing edges path (distance, rotation)"""
+        previous_edge = None
+        distance = 0
+        rotation = 0
+        for edge in edges:
+            distance += edge.length
+            rotation += self.get_rotation(previous_edge, edge)
+        return distance, rotation
+
+    def get_rotation(self, previous_edge, edge):
+        """Return radians rotated after traversing previous edge and current edge"""
+        assert previous_edge is None or isinstance(previous_edge, Edge), "previous_edge must be an edge"
+        assert isinstance(edge, Edge), "edge must be an edge"
+        if previous_edge is None:
+            return 0
+        else:
+            assert previous_edge != edge, f"Can't get rotation between the same edges, {previous_edge} and {edge}"
+            return abs(Elbow(previous_edge, edge).angle())
+
     def __str__(self) -> str:
         str = "Graph:\n"
         for edge in self._edges:
