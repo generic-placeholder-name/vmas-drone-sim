@@ -1,5 +1,6 @@
 import torch
 from vmas.simulator.core import Landmark
+import numpy as np
 
 class Graph():
     """A Graph represents a collection of waypoints connected by edges."""
@@ -31,6 +32,67 @@ class Graph():
                     assert node1 != node2, "repeated waypoints in self._waypoints"
                     edge = Edge(node1, node2)
                     self.add_edge(edge)
+    
+    def remove_edges(self, edges : list):
+        """Remove unwanted edges from graph list"""
+        # Had to put import here, otherwise there was a circular dependency
+        from test import envConfig  # Get environment config to get penalty areas
+        print(f"Initial edges: {len(edges)}")
+        penalties = envConfig["penaltyAreas"]
+        self._edges = [edge for edge in edges if self.edge_valid(edge, penalties)]
+        print(f"Edges after removal: {len(self._edges)}")
+
+    def edge_valid(self, edge, penalties, margin=0.08):
+        """Ensure edge is valid, i.e. does not go through penalty area or too close to penalty area"""
+        w1 = edge.node1
+        w2 = edge.node2
+        w1_valid = self.waypoint_valid(w1, penalties)
+        w2_valid = self.waypoint_valid(w2, penalties)
+        if w1_valid and w2_valid:
+            for penalty in penalties:
+                # New top left and bottom right with padding
+                tl = torch.tensor([penalty["topLeft"][0],penalty["topLeft"][1]]) - torch.tensor([margin, margin])
+                br = torch.tensor([penalty["bottomRight"][0],penalty["bottomRight"][1]]) + torch.tensor([margin, margin])
+
+                # Rectangle corners (clockwise order)
+                corners = [tl, torch.tensor([br[0], tl[1]]), br, torch.tensor([tl[0], br[1]])]
+
+                # Check intersection between the line and each of the rectangle's sides
+                for i in range(4):
+                    if self.do_lines_intersect(w1.point, w2.point, corners[i], corners[(i + 1) % 4]):
+                        print(f"Edge {w1} to {w2} intersects with penalty area")
+                        return False
+            # No intersection, return True for valid
+            return True
+        else:
+            if not w1_valid:
+                print(f"Waypoint {w1} invalid")
+            if not w2_valid:
+                print(f"Waypoint {w2} invalid")
+            return False
+    
+    def do_lines_intersect(self, p1, p2, q1, q2):
+        # Calculate cross products to see if segments intersect
+        d1 = np.cross(np.array(p2) - np.array(p1), np.array(q1) - np.array(p1))
+        d2 = np.cross(np.array(p2) - np.array(p1), np.array(q2) - np.array(p1))
+        d3 = np.cross(np.array(q2) - np.array(q1), np.array(p1) - np.array(q1))
+        d4 = np.cross(np.array(q2) - np.array(q1), np.array(p2) - np.array(q1))
+
+        return (d1 * d2 < 0) and (d3 * d4 < 0)
+
+    def waypoint_valid(self, waypoint, penalties, margin=0.08):
+        """Ensure waypoint is valid, i.e. not in penalty area or too close to penalty area"""
+        point = waypoint.point
+        for penalty in penalties:
+            top_left_x = penalty["topLeft"][0] - margin
+            bottom_right_x = penalty["bottomRight"][0] + margin
+            top_left_y = penalty["topLeft"][1] - margin
+            bottom_right_y = penalty["bottomRight"][1] + margin
+            # Check if waypoint is within penalty area + margin/padding
+            if (top_left_x <= point[0].item() <= bottom_right_x) and (top_left_y <= point[1].item() <= bottom_right_y):
+                # It is in penalty area, is invalid so return False
+                return False
+        return True
 
     def add_waypoint(self, waypoint):
         assert isinstance(waypoint, Waypoint), "waypoint must be an instance of Waypoint"
