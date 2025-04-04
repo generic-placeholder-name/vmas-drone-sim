@@ -158,7 +158,6 @@ class Scenario(BaseScenario):
         
         self.total_rotation = torch.zeros(len(self.world.agents), device=device)  # Track total rotation for each agent
         self.prev_rotations = [agent.state.rot for agent in self.world.agents]  # Track previous rotation for each agent
-        # Generate goal (waypoints) points in reward areas
         print(f"World height: {world_height} \
               \nWorld width: {world_width}\n")
 
