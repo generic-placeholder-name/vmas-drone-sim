@@ -283,6 +283,14 @@ class Scenario(BaseScenario):
                         print(f"Collision by agent {agent_index}")
                         print(f"reward: {self.cumulative_reward}")
                         print("----------------------------")
+                        
+        #Checking drone collison, with another drone.
+        for i, agent2 in enumerate(self.world.agents):
+            if agent != agent2 and self.world.is_overlapping(agent, agent2):
+                self.cumulative_reward -= self.cumulative_reward
+                print(f"Agent {agent.name} collided with {agent2.name}!")
+                print(f"reward: {self.cumulative_reward}")
+                print("----------------------------")
         return self.cumulative_reward
 
     def observation(self, agent: Agent):
