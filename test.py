@@ -223,6 +223,11 @@ class Scenario(BaseScenario):
         self.total_distance = torch.tensor([0.0 for _ in self.world.agents])
         self.total_rotation = torch.zeros(self.n_agents, device=self.world.device)  # Reset total rotation
         self.prev_rotations = [agent.state.rot for agent in self.world.agents]  # Reset previous rotations
+        self.cumulative_reward = torch.zeros(
+            self.world.batch_dim,
+            device=self.world.device,
+            dtype=torch.float32,
+        )
         for i, goal in enumerate(goals):
             goal.set_pos(
                 self.waypoints[i].point,
@@ -254,8 +259,12 @@ class Scenario(BaseScenario):
             if landmark.state.pos is not None and agent.state.pos is not None:
                 if landmark.name.startswith("goal"):
                     # print(i, landmark.state.pos, agent.state.pos, torch.linalg.vector_norm(landmark.state.pos - agent.state.pos), self.reward_radius)
-                    if self.world.is_overlapping(agent, landmark) and self.waypoint_visits[agent_index, i] == 0:
+                    if self.world.is_overlapping(agent, landmark) and self.waypoint_visits[agent_index, i] == 0 and ((agent_index == 0 and self.waypoint_visits[1, i] == 0) or (agent_index == 1 and self.waypoint_visits[0, i] == 0)):
                         self.cumulative_reward += 1.0
+                        # if agent_index == 0 and self.waypoint_visits[1, i] == 0:
+                        #     self.cumulative_reward += 1.0            
+                        # elif agent_index == 1 and self.waypoint_visits[0, i] == 0:
+                        #     self.cumulative_reward += 1.0
                         self.waypoint_visits[agent_index, i] += 1
                         print(f"Agent {agent_index} reached waypoint {i}!")
                         print(f"Waypoint visits: {self.waypoint_visits[agent_index]}")
