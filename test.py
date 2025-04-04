@@ -260,7 +260,7 @@ class Scenario(BaseScenario):
                         print(f"Agent {agent_index} reached waypoint {i}!")
                         print(f"Waypoint visits: {self.waypoint_visits[agent_index]}")
                         print(f"reward: {self.cumulative_reward}")
-                        print~~(f"total distance: {self.total_distance[agent_index]}")
+                        print(f"total distance: {self.total_distance[agent_index]}")
                         print("----------------------------")
                 elif self.world.is_overlapping(agent, landmark):
                     if landmark.collides(agent):
