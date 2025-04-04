@@ -161,6 +161,21 @@ class Scenario(BaseScenario):
         # Generate goal (waypoints) points in reward areas
         print(f"World height: {world_height} \
               \nWorld width: {world_width}\n")
+
+        # Generate waypoints at start locations
+        for (x, y) in self.agent_start_pos:
+            point = torch.Tensor([x.item(), y.item()], device=device)
+            goal = Landmark(
+                name=f"goal {len(self.waypoints)}",
+                collide=False,
+                shape=Sphere(radius=self.reward_radius),
+                color=Color.LIGHT_GREEN,
+            )
+            # if agent in point
+            world.add_landmark(goal)
+            self.waypoints.append(Waypoint(point, goal, reward_radius=self.reward_radius))
+
+         # Generate goal (waypoints) points in reward areas
         for x in torch.arange(self.grid_resolution/2, world_width, self.grid_resolution):
             for y in torch.arange(self.grid_resolution/2, world_height, self.grid_resolution):
                 point = [x.item(), y.item()]
