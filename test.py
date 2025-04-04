@@ -174,7 +174,7 @@ class Scenario(BaseScenario):
             world.add_landmark(goal)
             self.waypoints.append(Waypoint(point, goal, reward_radius=self.reward_radius))
 
-         # Generate goal (waypoints) points in reward areas
+        # Generate goal (waypoints) points in reward areas
         for x in torch.arange(self.grid_resolution/2, world_width, self.grid_resolution):
             for y in torch.arange(self.grid_resolution/2, world_height, self.grid_resolution):
                 point = [x.item(), y.item()]
