@@ -269,7 +269,6 @@ class Scenario(BaseScenario):
                         print(f"reward: {self.cumulative_reward}")
                         print("----------------------------")
                         
-                        
         #Checking drone collison, with another drone.
         for i, agent2 in enumerate(self.world.agents):
             
