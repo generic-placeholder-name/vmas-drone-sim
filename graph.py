@@ -117,7 +117,7 @@ class Graph():
             return 0
         else:
             assert previous_edge != edge, f"Can't get rotation between the same edges, {previous_edge} and {edge}"
-            return Elbow(previous_edge, edge).angle()
+            return Elbow(previous_edge, edge).rotation()
 
     def __str__(self) -> str:
         str = "Graph:\n"
@@ -249,12 +249,16 @@ class Elbow():
         self._edge = edge
         self._previous_edge = previous_edge
         self._weight = torch.tensor(weight, dtype=torch.float32)
+        self._point1 = None
+        self._point2 = None
+        self._point3 = None
 
         assert isinstance(edge, Edge), "edge must be an instance of Edge"
         assert isinstance(previous_edge, Edge), "previous_edge must be an instance of Edge"
         assert get_node_in_common(previous_edge, edge) is not None, "The edges must be connected"
         assert previous_edge != edge, "The edges must not be the same"
         assert self._weight > 0, "Weight must be positive"
+        self.set_ordered_points()
 
     @property
     def edge(self):
@@ -278,11 +282,25 @@ class Elbow():
         if self._weight < 0:
             self._weight = torch.tensor(0.0, dtype=torch.float32)
 
+    def set_ordered_points(self):
+        common_node = self.get_common_node()
+        self.point1 = self.previous_edge.node1.point if self.previous_edge.node2 == common_node else self.previous_edge.node2.point
+        self.point2 = common_node.point
+        self.point3 = self.edge.node2.point if self.edge.node1 == common_node else self.edge.node1.point
+
+    def get_common_node(self):
+        if self.previous_edge.node1 in self.edge.nodes:
+            return self.previous_edge.node1
+        elif self.previous_edge.node2 in self.edge.nodes:
+            return self.previous_edge.node2
+        else:
+            raise ValueError(f"No common node found in edges. Nodes found: {self.previous_edge.node1}, {self.previous_edge.node2}, {self.edge.node1}, {self.edge.node2}")
+        
     def angle(self):
         """Calculate the angle (in radians) between the two edges."""
         # Get the direction vectors of the edges
-        dir1 = self._edge._node2.point - self._edge._node1.point
-        dir2 = self._previous_edge._node2.point - self._previous_edge._node1.point
+        dir1 = self.point3 - self.point2
+        dir2 = self.point1 - self.point2
         
         # Normalize the direction vectors
         dir1 = dir1 / torch.linalg.vector_norm(dir1)
@@ -291,6 +309,9 @@ class Elbow():
         # Calculate the angle using the dot product
         cos_theta = torch.dot(dir1, dir2)
         return torch.acos(torch.clamp(cos_theta, -1.0, 1.0))
+    
+    def rotation(self):
+        return torch.pi - self.angle()
 
 def get_node_in_common(edge1, edge2):
     """Get the node in common between two edges."""
