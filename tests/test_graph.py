@@ -170,10 +170,10 @@ def test_graph_generate_edges(graph_with_generated_edges):
     assert str(graph_with_generated_edges) == ("Graph:" +
                                                "\nEdge(A(tensor([1., 1.])), B(tensor([2., 3.]))) (weight: 1.0)" +
                                                "\nEdge(A(tensor([1., 1.])), C(tensor([3.0000, 2.5000]))) (weight: 1.0)" +
-                                               "\nEdge(A(tensor([1., 1.])), D(tensor([6., 1.]))) (weight: 1.0)" +
+                                               "\nEdge(A(tensor([1., 1.])), D(tensor([5., 1.]))) (weight: 1.0)" +
                                                "\nEdge(B(tensor([2., 3.])), C(tensor([3.0000, 2.5000]))) (weight: 1.0)" +
-                                               "\nEdge(B(tensor([2., 3.])), D(tensor([6., 1.]))) (weight: 1.0)" +
-                                               "\nEdge(C(tensor([3.0000, 2.5000])), D(tensor([6., 1.]))) (weight: 1.0)\n")
+                                               "\nEdge(B(tensor([2., 3.])), D(tensor([5., 1.]))) (weight: 1.0)" +
+                                               "\nEdge(C(tensor([3.0000, 2.5000])), D(tensor([5., 1.]))) (weight: 1.0)\n")
     
 def test_graph_get_neighbors_untraversed(graph_with_generated_edges, waypoint1, waypoint2, waypoint3, waypoint4):
     node_neighbors, edge_neighbors = graph_with_generated_edges.get_neighbors(waypoint3)
@@ -237,16 +237,16 @@ def test_get_edges_from_waypoint_tour(graph_with_generated_edges,
     assert edge_tour[1] == edge_w2_w3, f"expected: {edge_w2_w3}, actual: {edge_tour[1]}"
     assert edge_tour[2] == edge_w3_w4, f"expected: {edge_w3_w4}, actual: {edge_tour[2]}"
 
-def test_get_rotation(graph_with_generated_edges, edge_w1_w2, edge_w2_w3, edge_w3_w4, edge_w1_w4):
-    # Verify that the correct angles are generated
+def test_get_rotation(graph_with_generated_edges, edge_w1_w2, edge_w2_w3, edge_w3_w4, edge_w1_w4, edge_w1_w3, edge_w2_w4):
+    # Verify that the correct rotations are generated
     assert graph_with_generated_edges.get_rotation(None, edge_w1_w2) == 0
-    assert graph_with_generated_edges.get_rotation(edge_w1_w2, edge_w2_w3) == 0 # TODO: calculate angle
-    assert graph_with_generated_edges.get_rotation(edge_w2_w3, edge_w3_w4) == 0 # TODO: calculate angle
-    assert graph_with_generated_edges.get_rotation(edge_w3_w4, edge_w1_w4) == 0 # TODO: calculate angle
-    # Check that when edges are flipped, angle is negated
-    assert graph_with_generated_edges.get_rotation(edge_w1_w2, edge_w2_w3) == -1 * graph_with_generated_edges.get_rotation(edge_w2_w3, edge_w1_w2)
-    assert graph_with_generated_edges.get_rotation(edge_w2_w3, edge_w3_w4) == -1 * graph_with_generated_edges.get_rotation(edge_w3_w4, edge_w2_w3)
-    assert graph_with_generated_edges.get_rotation(edge_w3_w4, edge_w1_w4) == -1 * graph_with_generated_edges.get_rotation(edge_w1_w4, edge_w3_w4)
+    assert graph_with_generated_edges.get_rotation(edge_w1_w2, edge_w2_w3) == torch.pi - torch.arccos((edge_w1_w2.length**2 + edge_w2_w3.length**2 - edge_w1_w3.length**2) / (2 * edge_w1_w2.length * edge_w2_w3.length))
+    assert graph_with_generated_edges.get_rotation(edge_w2_w3, edge_w3_w4) == torch.pi - torch.arccos((edge_w2_w3.length**2 + edge_w3_w4.length**2 - edge_w2_w4.length**2) / (2 * edge_w2_w3.length * edge_w3_w4.length))
+    assert graph_with_generated_edges.get_rotation(edge_w3_w4, edge_w1_w4) == torch.pi - torch.arccos((edge_w3_w4.length**2 + edge_w1_w4.length**2 - edge_w1_w3.length**2) / (2 * edge_w3_w4.length * edge_w1_w4.length))
+    # Check that when edges are flipped, rotation is the same
+    assert graph_with_generated_edges.get_rotation(edge_w1_w2, edge_w2_w3) == graph_with_generated_edges.get_rotation(edge_w2_w3, edge_w1_w2)
+    assert graph_with_generated_edges.get_rotation(edge_w2_w3, edge_w3_w4) == graph_with_generated_edges.get_rotation(edge_w3_w4, edge_w2_w3)
+    assert graph_with_generated_edges.get_rotation(edge_w3_w4, edge_w1_w4) == graph_with_generated_edges.get_rotation(edge_w1_w4, edge_w3_w4)
 
 def test_get_path_costs(graph_with_generated_edges, edge_w1_w2, edge_w2_w3, edge_w3_w4):
     total_distance = edge_w1_w2.length + edge_w2_w3.length + edge_w3_w4.length

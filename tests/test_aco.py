@@ -27,7 +27,7 @@ def test_ant_get_rotation(ant1, edge_w1_w2, edge_w2_w3):
     assert ant1.current_node == edge_w1_w2.node1
     ant1.move_to(edge_w1_w2.node2, edge_w1_w2)
     #ant1.move_to(edge_w2_w3.node2, edge_w2_w3)
-    assert ant1.get_rotation(edge_w2_w3) == abs(Elbow(edge_w1_w2, edge_w2_w3).angle())
+    assert ant1.get_rotation(edge_w2_w3) == abs(Elbow(edge_w1_w2, edge_w2_w3).rotation())
 
 @pytest.fixture
 def edge_w3_w2(waypoint3, waypoint2):
@@ -56,14 +56,14 @@ def test_ant_move_to(ant1, waypoint1, waypoint2, waypoint3, waypoint4, edge_w1_w
     assert ant1.node_solution == [waypoint1, waypoint2, waypoint3]
     assert ant1.edge_solution == [edge_w1_w2, edge_w3_w2]
     assert ant1.total_distance == edge_w1_w2.length + edge_w3_w2.length
-    assert ant1.total_rotation == 0.1 + abs(Elbow(edge_w1_w2, edge_w3_w2).angle())
+    assert ant1.total_rotation == 0.1 + abs(Elbow(edge_w1_w2, edge_w3_w2).rotation())
 
     ant1.move_to(edge_w3_w4.node2, edge_w3_w4)
     assert ant1.current_node == waypoint4
     assert ant1.node_solution == [waypoint1, waypoint2, waypoint3, waypoint4]
     assert ant1.edge_solution == [edge_w1_w2, edge_w3_w2, edge_w3_w4]
     assert ant1.total_distance == edge_w1_w2.length + edge_w3_w2.length + edge_w3_w4.length
-    assert ant1.total_rotation == 0.1 + abs(Elbow(edge_w1_w2, edge_w3_w2).angle()) + abs(Elbow(edge_w3_w2, edge_w3_w4).angle())
+    assert ant1.total_rotation == 0.1 + abs(Elbow(edge_w1_w2, edge_w3_w2).rotation()) + abs(Elbow(edge_w3_w2, edge_w3_w4).rotation())
 
 def test_calculate_edges_specs(ant1, edge_w1_w2, edge_w1_w3, edge_w1_w4):
     edge_w1_w2.weight = 5

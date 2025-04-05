@@ -107,6 +107,7 @@ class Graph():
         for edge in edges:
             distance += edge.length
             rotation += self.get_rotation(previous_edge, edge)
+            previous_edge = edge
         return distance, rotation
 
     def get_rotation(self, previous_edge, edge):
