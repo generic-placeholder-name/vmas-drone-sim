@@ -3,6 +3,7 @@ from test import Scenario
 from graph import *
 from typing import List
 from torch import Tensor
+from test import envConfig
 
 _scenario = Scenario()
 _print_log = False
@@ -211,7 +212,11 @@ if __name__ == "__main__":
     _scenario.reset_world_at()
     graph = Graph(_scenario.waypoints)
     graph.generate_edges()
-    graph.remove_edges(graph.edges)
+
+    penalty_areas = envConfig["penaltyAreas"] # get penalty areas from envConfig in test.py
+    bad_edges = [edge for edge in graph.edges if not graph.edge_valid(edge, penalty_areas)] # edges are bad if they do not pass edge_valid
+    graph.remove_edges(bad_edges) # remove bad edges
+
     aco = ACO(graph)
     path = aco.get_optimum_path()
     if aco.best_ant is not None:

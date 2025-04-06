@@ -33,13 +33,11 @@ class Graph():
                     edge = Edge(node1, node2)
                     self.add_edge(edge)
     
-    def remove_edges(self, edges : list):
+    def remove_edges(self, bad_edges : list):
         """Remove unwanted edges from graph list"""
-        # Had to put import here, otherwise there was a circular dependency
-        from test import envConfig  # Get environment config to get penalty areas
-        print(f"Initial edges: {len(edges)}")
-        penalties = envConfig["penaltyAreas"]
-        self._edges = [edge for edge in edges if self.edge_valid(edge, penalties)]
+        print(f"Initial edges: {len(self._edges)}")
+        good_edges = [edge for edge in self._edges if edge not in bad_edges]
+        self._edges = good_edges
         print(f"Edges after removal: {len(self._edges)}")
 
     def edge_valid(self, edge, penalties, margin=0.08):
