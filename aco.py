@@ -283,24 +283,24 @@ def bound(value, min_bound, max_bound):
 if __name__ == "__main__":
     _scenario.make_world(batch_dim=1, device='cpu') # "cpu" underlined but doesn't cause error
     _scenario.reset_world_at()
-    aco_1ant_1iteration = ACO(_scenario.waypoints, 20, 25, "MMAS")
-    path = aco_1ant_1iteration.get_optimum_tour()
-    if aco_1ant_1iteration.best_tour_edges is not None:
-        for edge in aco_1ant_1iteration.best_tour_edges:
+    aco = ACO(_scenario.waypoints, 20, 25, "MMAS")
+    path = aco.get_optimum_tour()
+    if aco.best_tour_edges is not None:
+        for edge in aco.best_tour_edges:
             print(edge)
     for waypoint in path:
         print(waypoint)
 
     print("\nall time best solution:\n")
-    print(f"Total distance: {aco_1ant_1iteration.best_tour_distance}")
-    print(f"Total radians rotated: {aco_1ant_1iteration.best_tour_rotation}")
-    print(f"Performance: {heuristic(aco_1ant_1iteration.best_tour_distance, aco_1ant_1iteration.best_tour_rotation)}")
-    print(f"Number of waypoints visited: {len(aco_1ant_1iteration.best_tour_nodes)} out of {len(aco_1ant_1iteration.graph.waypoints)}")
+    print(f"Total distance: {aco.best_tour_distance}")
+    print(f"Total radians rotated: {aco.best_tour_rotation}")
+    print(f"Performance: {heuristic(aco.best_tour_distance, aco.best_tour_rotation)}")
+    print(f"Number of waypoints visited: {len(aco.best_tour_nodes)} out of {len(aco.graph.waypoints)}")
 
     print("\ncurrent best ant:\n")
-    if aco_1ant_1iteration.best_ant_current is not None:
-        print(f"Total distance: {aco_1ant_1iteration.best_ant_current.total_distance}")
-        print(f"Total radians rotated: {aco_1ant_1iteration.best_ant_current.total_rotation}")
-        print(f"Performance: {heuristic(aco_1ant_1iteration.best_ant_current.total_distance, aco_1ant_1iteration.best_ant_current.total_rotation)}")
-        print(f"Number of waypoints visited: {len(aco_1ant_1iteration.best_ant_current.node_solution)} out of {len(aco_1ant_1iteration.graph.waypoints)}")
+    if aco.best_ant_current is not None:
+        print(f"Total distance: {aco.best_ant_current.total_distance}")
+        print(f"Total radians rotated: {aco.best_ant_current.total_rotation}")
+        print(f"Performance: {heuristic(aco.best_ant_current.total_distance, aco.best_ant_current.total_rotation)}")
+        print(f"Number of waypoints visited: {len(aco.best_ant_current.node_solution)} out of {len(aco.graph.waypoints)}")
     
