@@ -3,13 +3,14 @@ from test import Scenario
 from graph import *
 from typing import List
 from torch import Tensor
+from test import envConfig
 
 _scenario = Scenario()
 _print_log = False
 
 
 class ACO:
-    def __init__(self, waypoints, num_ants=20, max_iterations=100, algorithm="AS", evaporation_rate=0.1, Q=1, max_pheromone=10, min_pheromone=0) -> None:
+    def __init__(self, graph: Graph, num_ants=20, max_iterations=100, algorithm="AS", evaporation_rate=0.1, Q=1, max_pheromone=10, min_pheromone=0) -> None:
         """
         Args:
             scenario (Scenario): The scenario that the ACO algorithm will be run on
@@ -21,8 +22,7 @@ class ACO:
             max_pheromone (int): The max amount of pheromone that an edge can have, used for MMAS algorithm
             min_pheromone (int): The min amount of pheromone that an edge can have, used for MMAS algorithm
         """
-        self.graph = Graph(waypoints)
-        self.graph.generate_edges()
+        self.graph = graph
         self.num_ants = num_ants
         self.max_iterations = max_iterations
         self.ants = []
@@ -210,7 +210,14 @@ def heuristic(distance, rotation, min_rotation_constant=0.1):
 if __name__ == "__main__":
     _scenario.make_world(batch_dim=1, device='cpu') # "cpu" underlined but doesn't cause error
     _scenario.reset_world_at()
-    aco = ACO(_scenario.waypoints)
+    graph = Graph(_scenario.waypoints)
+    graph.generate_edges()
+
+    penalty_areas = envConfig["penaltyAreas"] # get penalty areas from envConfig in test.py
+    bad_edges = [edge for edge in graph.edges if not graph.edge_valid(edge, penalty_areas)] # edges are bad if they do not pass edge_valid
+    graph.remove_edges(bad_edges) # remove bad edges
+
+    aco = ACO(graph)
     path = aco.get_optimum_path()
     if aco.best_ant is not None:
         for edge in aco.best_ant.edge_solution:

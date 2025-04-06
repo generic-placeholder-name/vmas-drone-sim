@@ -158,7 +158,6 @@ class Scenario(BaseScenario):
         
         self.total_rotation = torch.zeros(len(self.world.agents), device=device)  # Track total rotation for each agent
         self.prev_rotations = [agent.state.rot for agent in self.world.agents]  # Track previous rotation for each agent
-        
         print(f"World height: {world_height} \
               \nWorld width: {world_width}\n")
         
@@ -171,7 +170,7 @@ class Scenario(BaseScenario):
                     if is_point_in_polygon(point, reward_area): # TODO: Check that point not in penalty areas
                         print("Is in reward area\n")
                         goal = Landmark(
-                            name=f"goal {len(self.waypoints)}",
+                            name=f"goal_{len(self.waypoints)}",
                             collide=False,
                             shape=Sphere(radius=self.reward_radius),
                             color=Color.LIGHT_GREEN,
@@ -180,13 +179,14 @@ class Scenario(BaseScenario):
                         world.add_landmark(goal)
                         scaled_point = torch.Tensor(point, device=device) * 2 - world_dims
                         self.waypoints.append(Waypoint(scaled_point, goal, reward_radius=self.reward_radius))
+                        print(f"Waypoint {len(self.waypoints)-1} created at {point}")
                         break
 
         # Generate waypoints at start locations
         for (x, y) in self.agent_start_pos:
             point = torch.Tensor([x.item(), y.item()], device=device)
             goal = Landmark(
-                name=f"goal {len(self.waypoints)}",
+                name=f"goal_{len(self.waypoints)}",
                 collide=False,
                 shape=Sphere(radius=self.reward_radius),
                 color=Color.LIGHT_GREEN,
@@ -213,7 +213,7 @@ class Scenario(BaseScenario):
 
 
             obstacle = Landmark(
-                name=f"obstacle {i}",
+                name=f"obstacle_{i}",
                 collide=True,  # Penalty areas are collidable
                 movable=False,
                 shape=obstacle_shape, # Need to multiply by two due to nature of vmas coordinate system
@@ -271,9 +271,10 @@ class Scenario(BaseScenario):
                 if landmark.name.startswith("goal"):
                     # print(i, landmark.state.pos, agent.state.pos, torch.linalg.vector_norm(landmark.state.pos - agent.state.pos), self.reward_radius)
                     if self.world.is_overlapping(agent, landmark) and self.waypoint_visits[agent_index, i] == 0:
+                        waypoint_index = self.get_waypoint_index(landmark)
                         self.cumulative_reward += 1.0
-                        self.waypoint_visits[agent_index, i] += 1
-                        print(f"Agent {agent_index} reached waypoint {i}!")
+                        self.waypoint_visits[agent_index, waypoint_index] += 1
+                        print(f"Agent {agent_index} reached waypoint {waypoint_index}!")
                         print(f"Waypoint visits: {self.waypoint_visits[agent_index]}")
                         print(f"reward: {self.cumulative_reward}")
                         print(f"total distance: {self.total_distance[agent_index]}")
