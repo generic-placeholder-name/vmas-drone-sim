@@ -79,8 +79,10 @@ def test_calculate_edges_specs(ant1, edge_w1_w2, edge_w1_w3, edge_w1_w4):
     edges = [edge_w1_w2, edge_w1_w3, edge_w1_w4]
     assert ant1.calculate_edges_specs(edges) == ([edge_w1_w2_favorability, edge_w1_w3_favorability, edge_w1_w4_favorability], [edge_w1_w2_cost, edge_w1_w3_cost, edge_w1_w4_cost])
 
-def test_ant1_move_next(ant1, waypoint1, waypoint2, waypoint3, waypoint4, edge_w1_w2, edge_w1_w3, edge_w1_w4):
-    potential_nodes, potential_edges = ant1.graph.get_neighbors(waypoint1, exclude_traversed=True)
+def test_ant_move_next(graph_with_generated_edges, waypoint1, waypoint2, waypoint3, waypoint4, edge_w1_w2, edge_w1_w3, edge_w1_w4, edge_w2_w3, edge_w2_w4): #TODO: FINISH
+    num_samples = 10000
+    ant = Ant(graph_with_generated_edges, waypoint1)
+    potential_nodes, potential_edges = ant.graph.get_neighbors(waypoint1, exclude_traversed=True)
     assert potential_nodes == [waypoint2, waypoint3, waypoint4]
     assert potential_edges == [edge_w1_w2, edge_w1_w3, edge_w1_w4]
 
@@ -88,6 +90,71 @@ def test_ant1_move_next(ant1, waypoint1, waypoint2, waypoint3, waypoint4, edge_w
     edge_w1_w3_favorability = 1 * (1/edge_w1_w3.length) * (1/0.1)
     edge_w1_w4_favorability = 1 * (1/edge_w1_w4.length) * (1/0.1)
 
+    total_favorability = sum([edge_w1_w2_favorability, edge_w1_w3_favorability, edge_w1_w4_favorability])
+    prob_edge_w1_w2 = edge_w1_w2_favorability / total_favorability
+    prob_edge_w1_w3 = edge_w1_w3_favorability / total_favorability
+    prob_edge_w1_w4 = edge_w1_w4_favorability / total_favorability
+
+    num_w2 = 0
+    num_w3 = 0
+    num_w4 = 0
+    for _ in range(num_samples):
+        ant.move_next()
+        assert ant.current_node in [waypoint2, waypoint3, waypoint4], f"Expected: {waypoint2}, {waypoint3}, or {waypoint4}. Actual: {ant.current_node}."
+        if ant.current_node == waypoint2:
+            num_w2 += 1
+        elif ant.current_node == waypoint3:
+            num_w3 += 1
+        elif ant.current_node == waypoint4:
+            num_w4 += 1
+        ant = Ant(graph_with_generated_edges, waypoint1)
+        graph_with_generated_edges.reset_traversed()
+    
+    assert num_w2 + num_w3 + num_w4 == num_samples
+    assert torch.isclose(torch.tensor(num_w2 / num_samples), prob_edge_w1_w2, atol=0.01)
+    assert torch.isclose(torch.tensor(num_w3 / num_samples), prob_edge_w1_w3, atol=0.01)
+    assert torch.isclose(torch.tensor(num_w4 / num_samples), prob_edge_w1_w4, atol=0.01)
+
+def test_ant_move_next_with_pheromones(graph_with_generated_edges, waypoint1, waypoint2, waypoint3, waypoint4):
+    num_samples = 10000
+    ant = Ant(graph_with_generated_edges, waypoint1)
+
+    edge_w2_w3 = graph_with_generated_edges.get_edge(waypoint2, waypoint3)
+    edge_w2_w4 = graph_with_generated_edges.get_edge(waypoint2, waypoint4)
+    edge_w1_w2 = graph_with_generated_edges.get_edge(waypoint1, waypoint2)
+
+    ant.move_to(waypoint2, edge_w1_w2)
+    assert ant.current_node == waypoint2
+    potential_nodes, potential_edges = ant.graph.get_neighbors(ant.current_node, exclude_traversed=True)
+    assert potential_nodes == [waypoint3, waypoint4]
+    assert potential_edges == [edge_w2_w3, edge_w2_w4]
+
+    edge_w2_w3.weight = 5
+    edge_w2_w4.weight = 0.5
+    
+    edge_w2_w3_favorability = 5 * (1/edge_w2_w3.length) * (1/graph_with_generated_edges.get_rotation(edge_w1_w2, edge_w2_w3)) # edge weight * (1/length) * (1/rotation) where min rotation is 0.1 to avoid divide by zero error
+    edge_w2_w4_favorability = 0.5 * (1/edge_w2_w4.length) * (1/graph_with_generated_edges.get_rotation(edge_w1_w2, edge_w2_w4))
+
+    total_favorability = sum([edge_w2_w3_favorability, edge_w2_w4_favorability])
+    prob_edge_w2_w3 = edge_w2_w3_favorability / total_favorability
+    prob_edge_w2_w4 = edge_w2_w4_favorability / total_favorability
+
+    num_w3 = 0
+    num_w4 = 0
+    for _ in range(num_samples):
+        ant.move_next()
+        assert ant.current_node in [waypoint3, waypoint4], f"Expected: {waypoint3}, or {waypoint4}. Actual: {ant.current_node}."
+        if ant.current_node == waypoint3:
+            num_w3 += 1
+        elif ant.current_node == waypoint4:
+            num_w4 += 1
+        graph_with_generated_edges.reset_traversed()
+        ant = Ant(graph_with_generated_edges, waypoint1)
+        ant.move_to(waypoint2, edge_w1_w2)
+    
+    assert num_w3 + num_w4 == num_samples
+    assert torch.isclose(torch.tensor(num_w3 / num_samples), prob_edge_w2_w3, atol=0.01)
+    assert torch.isclose(torch.tensor(num_w4 / num_samples), prob_edge_w2_w4, atol=0.01)
 
 @pytest.fixture
 def aco_1ant_1iteration(graph_with_generated_edges):

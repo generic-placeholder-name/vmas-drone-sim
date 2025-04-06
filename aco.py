@@ -8,7 +8,7 @@ _scenario = Scenario()
 _print_log = False
 
 class ACO:
-    def __init__(self, waypoints, num_ants=20, max_iterations=100, algorithm="AS", evaporation_rate=0.5, Q=1, max_pheromone=10, min_pheromone=0, min_rotation=0.1) -> None:
+    def __init__(self, waypoints, num_ants=20, max_iterations=100, algorithm="AS", evaporation_rate=0.001, Q=1, max_pheromone=10, min_pheromone=0, min_rotation=0.1) -> None:
         """
         Args:
             scenario (Scenario): The scenario that the ACO algorithm will be run on
@@ -135,7 +135,7 @@ class ACO:
             for edge in ant.edge_solution:
                 assert ant.total_distance > 0, f"Ant's total distance must be greater than zero. Actual: {ant.total_distance}"
                 assert ant.total_rotation > 0, f"Ant's total rotation must be greater than zero. Actual: {ant.total_rotation}"
-                edge.weight += self.Q * heuristic(ant.total_distance, ant.total_rotation) # Q * (1/L) * (1/theta)
+                edge.add_weight(self.Q * heuristic(ant.total_distance, ant.total_rotation)) # Q * (1/L) * (1/theta)
 
     def deposit_pheromones_mmas(self, all_time=False):
         """The best ant deposits pheromones on traversed edges, following Max-Min Ant System"""
@@ -155,7 +155,7 @@ class ACO:
         rotation = max(float(rotation), self.min_rotation) # Limit the favorability of an edge
         for edge in edge_tour:
             added_pheromone = heuristic(distance, rotation) # (1/L_best) * (1/theta_best)
-            edge.weight = bound(edge.weight + added_pheromone, self.min_pheromone, self.max_pheromone)
+            edge.weight = bound(edge.weight + added_pheromone, self.min_pheromone, self.max_pheromone) #TODO: MAKE SURE GETS HERE
 
 
 class Ant:
@@ -283,7 +283,7 @@ def bound(value, min_bound, max_bound):
 if __name__ == "__main__":
     _scenario.make_world(batch_dim=1, device='cpu') # "cpu" underlined but doesn't cause error
     _scenario.reset_world_at()
-    aco_1ant_1iteration = ACO(_scenario.waypoints, 20, 30, "MMAS")
+    aco_1ant_1iteration = ACO(_scenario.waypoints, 20, 25, "MMAS")
     path = aco_1ant_1iteration.get_optimum_tour()
     if aco_1ant_1iteration.best_tour_edges is not None:
         for edge in aco_1ant_1iteration.best_tour_edges:
@@ -291,7 +291,7 @@ if __name__ == "__main__":
     for waypoint in path:
         print(waypoint)
 
-    print("\nall time best solution:\n") # TODO: all time is performing worse than the most recent, which isn't right. Look into this.
+    print("\nall time best solution:\n")
     print(f"Total distance: {aco_1ant_1iteration.best_tour_distance}")
     print(f"Total radians rotated: {aco_1ant_1iteration.best_tour_rotation}")
     print(f"Performance: {heuristic(aco_1ant_1iteration.best_tour_distance, aco_1ant_1iteration.best_tour_rotation)}")
