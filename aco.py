@@ -1,5 +1,5 @@
 from gettext import find
-from drone_simmulation import Scenario
+from drone_simulation import Scenario
 from graph import *
 from typing import List
 from torch import Tensor
