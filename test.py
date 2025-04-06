@@ -186,7 +186,7 @@ class Scenario(BaseScenario):
         for (x, y) in self.agent_start_pos:
             point = torch.Tensor([x.item(), y.item()], device=device)
             goal = Landmark(
-                name=f"goal {len(self.waypoints)}",
+                name=f"goal_{len(self.waypoints)}",
                 collide=False,
                 shape=Sphere(radius=self.reward_radius),
                 color=Color.LIGHT_GREEN,
