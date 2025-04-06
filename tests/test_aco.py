@@ -157,7 +157,7 @@ def test_ant_move_next_with_pheromones(graph_with_generated_edges, waypoint1, wa
     assert torch.isclose(torch.tensor(num_w4 / num_samples), prob_edge_w2_w4, atol=0.01)
 
 @pytest.fixture
-def aco(graph_with_generated_edges):
+def aco_1ant_1iteration(graph_with_generated_edges):
     return ACO(graph_with_generated_edges.waypoints, 1, 1, "MMAS")
 
 
