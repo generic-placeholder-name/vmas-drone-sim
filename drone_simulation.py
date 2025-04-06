@@ -162,19 +162,6 @@ class Scenario(BaseScenario):
         print(f"World height: {world_height} \
               \nWorld width: {world_width}\n")
         
-        # Generate waypoints at start locations
-        for (x, y) in self.agent_start_pos:
-            point = torch.Tensor([x.item(), y.item()], device=device)
-            goal = Landmark(
-                name=f"goal {len(self.waypoints)}",
-                collide=False,
-                shape=Sphere(radius=self.reward_radius),
-                color=Color.LIGHT_GREEN,
-            )
-            # if agent in point
-            world.add_landmark(goal)
-            self.waypoints.append(Waypoint(point, goal, reward_radius=self.reward_radius))
-        
         # Generate goal (waypoints) points in reward areas
         for x in torch.arange(self.grid_resolution/2, world_width, self.grid_resolution):
             for y in torch.arange(self.grid_resolution/2, world_height, self.grid_resolution):
@@ -194,6 +181,20 @@ class Scenario(BaseScenario):
                         scaled_point = torch.Tensor(point, device=device) * 2 - world_dims
                         self.waypoints.append(Waypoint(scaled_point, goal, reward_radius=self.reward_radius))
                         break
+
+        # Generate waypoints at start locations
+        for (x, y) in self.agent_start_pos:
+            point = torch.Tensor([x.item(), y.item()], device=device)
+            goal = Landmark(
+                name=f"goal {len(self.waypoints)}",
+                collide=False,
+                shape=Sphere(radius=self.reward_radius),
+                color=Color.LIGHT_GREEN,
+            )
+            # if agent in point
+            world.add_landmark(goal)
+            self.waypoints.append(Waypoint(point, goal, reward_radius=self.reward_radius))
+
         self.waypoint_visits = torch.zeros([self.n_agents, len(self.waypoints)], device=device)  # Track waypoints visited by each drone
         
         # Add penalty areas as landmarks
@@ -231,7 +232,7 @@ class Scenario(BaseScenario):
     def reset_world_at(self, env_index: int | None = None):
         n_goals = len(self.waypoints)
         agents = [self.world.agents[i] for i in torch.randperm(self.n_agents).tolist()]
-        goals = [self.world.landmarks[i] for i in torch.randperm(n_goals).tolist()]
+        goals = [self.world.landmarks[i] for i in torch.range(start=0,end=n_goals-1,dtype=int).tolist()]
         order = range(len(self.world.landmarks[n_goals :]))
         obstacles = [self.world.landmarks[n_goals :][i] for i in order]
         self.waypoint_visits = torch.zeros([self.n_agents, len(self.waypoints)], device=self.world.device) # reset the counter
@@ -283,6 +284,14 @@ class Scenario(BaseScenario):
                         print(f"Collision by agent {agent_index}")
                         print(f"reward: {self.cumulative_reward}")
                         print("----------------------------")
+                        
+        #Checking drone collison, with another drone.
+        for i, agent2 in enumerate(self.world.agents):
+            if agent != agent2 and self.world.is_overlapping(agent, agent2):
+                self.cumulative_reward -= self.cumulative_reward
+                print(f"Agent {agent.name} collided with {agent2.name}!")
+                print(f"reward: {self.cumulative_reward}")
+                print("----------------------------")
         return self.cumulative_reward
 
     def observation(self, agent: Agent):
