@@ -191,6 +191,7 @@ class Scenario(BaseScenario):
         # Generate goal (waypoints) points in reward areas
         for x in torch.arange(self.grid_resolution/2, world_width, self.grid_resolution):
             for y in torch.arange(self.grid_resolution/2, world_height, self.grid_resolution):
+                print(f"Reward at {x.item()} {y.item()}")
                 point = [x.item(), y.item()]
                 print(point)
                 for reward_area in self.env_config["rewardAreas"]:

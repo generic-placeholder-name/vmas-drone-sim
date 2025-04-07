@@ -1,3 +1,4 @@
+from collections import defaultdict
 import numpy as np
 import matplotlib.pyplot as plt
 from shapely.geometry import LineString, Point, box as shapely_box
@@ -5,7 +6,7 @@ from shapely.ops import unary_union
 import networkx as nx
 
 #########################
-# Geometry and Pathfinding
+# Geometry and Pathfinding (No changes here)
 #########################
 
 def create_free_area(box_coords, obstacles):
@@ -82,66 +83,7 @@ def calculate_total_turn_angle(path):
     return total_turn
 
 #########################
-# Sweep Segment Generation
-#########################
-
-def generate_sweep_segments(angle, radius, bounds, obstacles):
-    """
-    For a given angle, generate sweep segments as follows:
-      - Create a family of parallel lines (spaced by 2*radius) covering the survey box.
-      - Intersect each line with the free area (box minus obstacles).
-      - Trim each resulting segment by removing a length equal to radius at each end.
-        If a segment is too short, use its midpoint.
-    Returns a list of segments as LineStrings.
-    """
-    free_area = create_free_area(bounds, obstacles)
-    # Unit vector in sweep direction.
-    d = np.array([np.cos(angle), np.sin(angle)])
-    # Perpendicular unit vector (for offsets).
-    n = np.array([-np.sin(angle), np.cos(angle)])
-    
-    # Determine offset range using box corners.
-    corners = np.array([[box_coords[0], box_coords[1]],
-                        [box_coords[0], box_coords[3]],
-                        [box_coords[2], box_coords[1]],
-                        [box_coords[2], box_coords[3]]])
-    projections = corners.dot(n)
-    c_min, c_max = projections.min(), projections.max()
-    
-    offsets = np.arange(c_min, c_max + 2*radius, 2*radius)
-    segments = []
-    far = max(box_coords[2]-box_coords[0], box_coords[3]-box_coords[1]) * 2
-    
-    for c in offsets:
-        p0 = c * n
-        p1 = p0 - far * d
-        p2 = p0 + far * d
-        line = LineString([tuple(p1), tuple(p2)])
-        inter = free_area.intersection(line)
-        if inter.is_empty:
-            continue
-        if inter.geom_type == 'MultiLineString':
-            inter = list(inter.geoms)
-        elif inter.geom_type == 'LineString':
-            inter = [inter]
-        else:
-            continue
-        
-        for seg in inter:
-            length = seg.length
-            if length >= 2*radius:
-                pt_start = np.array(seg.interpolate(radius).coords[0])
-                pt_end   = np.array(seg.interpolate(length - radius).coords[0])
-                trimmed = LineString([tuple(pt_start), tuple(pt_end)])
-            else:
-                mid = seg.interpolate(0.5, normalized=True)
-                trimmed = LineString([mid, mid]) # Duplicating the point is a bit better.
-            segments.append(trimmed)
-
-    return segments, free_area
-
-#########################
-# Merging Lines by Connecting Closest Endpoints
+# Merging Lines by Connecting Closest Endpoints (No changes here)
 #########################
 
 def merge_all_lines(lines, free_area, obstacles, num_iterations=10):
@@ -238,72 +180,180 @@ def merge_all_lines(lines, free_area, obstacles, num_iterations=10):
 
     return LineString(best_full_path_coords)
 
-#########################
-# Main: Generate Sweep Segments and Merge Them
-#########################
+def create_vertical_lines(waypoints, survey_radius, free_area):
+    """Create obstacle-aware vertical segments through waypoint columns"""
+    # Group waypoints by x-coordinate
+    columns = defaultdict(list)
+    for x, y in waypoints:
+        columns[x].append(y)
 
-def generate_tour(box_coords, obstacles, base_point, survey_radius, angle):
-    """
-    Generate a full tour of the box (given by box_coords), avoiding obstacles, using back-and-forth heuristic.
-    """
-    # Generate sweep segments.
-    segments, free_area = generate_sweep_segments(angle, survey_radius, box_coords, obstacles)
+    segments = []
+    
+    # Process each column
+    for x in sorted(columns.keys()):
+        ys = sorted(columns[x])
+        if not ys:
+            continue
+
+        current_segment = []
+        
+        # Scan through sorted y-values
+        for y in ys:
+            if not current_segment:
+                # Start new segment
+                current_segment.append(y)
+                continue
+                
+            # Check line from last point to current point
+            last_y = current_segment[-1]
+            test_line = LineString([(x, last_y), (x, y)])
+            
+            if free_area.contains(test_line):
+                # Continue current segment
+                current_segment.append(y)
+            else:
+                # Finalize current segment
+                if len(current_segment) >= 1:
+                    _finalize_segment(x, current_segment, segments, 
+                                         survey_radius, free_area)
+                # Start new segment
+                current_segment = [y]
+
+        # Add final segment in column
+        if current_segment:
+            _finalize_segment(x, current_segment, segments,
+                                 survey_radius, free_area)
+
+    return segments
+
+def _finalize_segment(x, y_values, segments, radius, free_area):
+    """Create and trim a vertical segment from collected y-values"""
+    y_min = min(y_values) - radius
+    y_max = max(y_values) + radius
+    line = LineString([(x, y_min), (x, y_max)])
+    
+    # Intersect with free area
+    inter = free_area.intersection(line)
+    if inter.is_empty:
+        return
+    
+    # Handle different geometry types
+    if inter.geom_type == 'MultiLineString':
+        parts = list(inter.geoms)
+    else:
+        parts = [inter]
+
+    # Trim each valid segment
+    for part in parts:
+        length = part.length
+        if length >= 2*radius:
+            start = part.interpolate(radius)
+            end = part.interpolate(length - radius)
+            segments.append(LineString([start, end]))
+        else:
+            mid = part.interpolate(0.5)
+            segments.append(LineString([mid, mid]))
+
+# Modified grid generation with obstacle checking
+def generate_grid_waypoints(box_coords, obstacles, survey_radius):
+    world_width = box_coords[2] - box_coords[0]
+    world_height = box_coords[3] - box_coords[1]
+    grid_res = min(world_width, world_height) // 5
+    
+    waypoints = []
+    free_area = create_free_area(box_coords, obstacles)
+    
+    # Generate grid points with collision checking
+    for x in np.arange(grid_res/2, world_width, grid_res):
+        for y in np.arange(grid_res/2, world_height, grid_res):
+            pt = Point(x + box_coords[0], y + box_coords[1])
+            if free_area.contains(pt):
+                waypoints.append((pt.x, pt.y))
+    
+    return waypoints, free_area
+
+def generate_drone_path(waypoints, base_point, survey_radius, free_area, obstacles):
+    """Generate path for single drone"""
+    # Create vertical lines through waypoints
+    segments = create_vertical_lines(waypoints, survey_radius, free_area)
+    
+    # Add base point connection
     segments.append(LineString([base_point, base_point]))
-    # Merge all lines into one closed loop.
+    
+    # Merge all lines
     try:
-        full_closed_path = merge_all_lines(segments, free_area, obstacles)
-    except ValueError as e:
-        raise Exception(f"Error during merging: {e}")
-    return full_closed_path
+        return merge_all_lines(segments, free_area, obstacles)
+    except Exception as e:
+        print(f"Path merging failed: {e}")
+        return None
 
-# Parameters.
-box_coords = (0, 0, 800, 620)  # Survey area dimensions.
+# Split survey area
+box_coords = (0, 0, 800, 620)
+split_x = 460
+left_box = (0, 0, split_x, 620)
+right_box = (split_x, 0, 800, 620)
+
 obstacles = [
-    (350, 120, 426, 220),  
-    (485, 280, 525, 378),   
+    (350, 120, 426, 220),
+    (485, 280, 525, 378),
     (350, 20, 400, 70),
     (175, 420, 225, 470),
 ]
-survey_radius = 25           # Drone's survey radius.
-base_point = (450, 200)  # You may choose a base point. (475, 200)
+survey_radius = 25
 
-#########################
-# Report and Visualization
-#########################
+# Generate waypoints
+waypoints, free_area = generate_grid_waypoints(box_coords, obstacles, survey_radius)
 
-for angle in range(0, 91, 10):
-    try: 
-        full_closed_path = generate_tour(box_coords, obstacles, base_point, survey_radius, np.radians(angle))
-        total_length = full_closed_path.length
-        total_turn_angle = calculate_total_turn_angle(full_closed_path)
+# Split waypoints between drones
+left_waypoints = [p for p in waypoints if p[0] <= split_x]
+right_waypoints = [p for p in waypoints if p[0] > split_x]
 
-        # Visualization.
-        fig, ax = plt.subplots(figsize=(8,8))
-        
-        # Plot free area.
-        x_free, y_free = shapely_box(*box_coords).exterior.xy
-        ax.fill(x_free, y_free, alpha=0.2, fc='green', ec='green')
-        
-        # Plot obstacles.
-        for obs in obstacles:
-            obs_poly = shapely_box(*obs)
-            x_obs, y_obs = obs_poly.exterior.xy
-            ax.fill(x_obs, y_obs, alpha=0.5, fc='gray', ec='gray')
-        
-        # Plot the full closed path.
-        x_path, y_path = full_closed_path.xy
-        ax.plot(x_path, y_path, 'r--', lw=2, label='Merged Survey Path')
-        
-        ax.set_xlim(box_coords[0]-5, box_coords[2]+5)
-        ax.set_ylim(box_coords[1]-5, box_coords[3]+5)
-        ax.set_aspect('equal')
-        ax.legend()
-        plt.title(f"Angle: {angle:.1f}° | Total Path Length: {total_length:.1f} | Total Turn Angle: {total_turn_angle:.1f}°")
-        plt.savefig(f"drone_merged_survey_path_{angle:.1f}.png")
-        plt.close()
-        
-        print(f"Total path length: {total_length:.1f}")
-        print(f"Total turning angle: {total_turn_angle:.1f}°")
-        print("Plot saved as 'drone_merged_survey_path.png'. Open it to view the survey path.")
-    except Exception as e:
-        print("Exception encountered:", e)
+# Generate paths
+base1 = (450, 200)
+base2 = (475, 200)
+path1 = generate_drone_path(left_waypoints, base1, survey_radius, free_area, obstacles)
+path2 = generate_drone_path(right_waypoints, base2, survey_radius, free_area, obstacles)
+
+# Visualization
+fig, ax = plt.subplots(figsize=(10, 8))
+
+# Plot free area and obstacles
+x_free, y_free = free_area.exterior.xy
+ax.fill(x_free, y_free, alpha=0.2, fc='green', ec='none')
+
+for obs in obstacles:
+    obs_poly = shapely_box(*obs)
+    x_obs, y_obs = obs_poly.exterior.xy
+    ax.fill(x_obs, y_obs, alpha=0.5, fc='gray', ec='gray')
+
+# Plot waypoints
+wp_x, wp_y = zip(*waypoints) if waypoints else ([], [])
+ax.scatter(wp_x, wp_y, c='black', s=10, alpha=0.5, label='Waypoints')
+
+# Plot drone paths
+if path1:
+    x1, y1 = path1.xy
+    ax.plot(x1, y1, 'r-', lw=2, label='Drone 1 Path')
+if path2:
+    x2, y2 = path2.xy
+    ax.plot(x2, y2, 'b-', lw=2, label='Drone 2 Path')
+
+# Add metrics
+stats = []
+if path1:
+    stats.append(f"Drone 1: Length={path1.length:.1f}, Turns={calculate_total_turn_angle(path1):.1f}°")
+if path2:
+    stats.append(f"Drone 2: Length={path2.length:.1f}, Turns={calculate_total_turn_angle(path2):.1f}°")
+    
+if stats:
+    ax.text(0.05, 0.95, "\n".join(stats), transform=ax.transAxes,
+            verticalalignment='top', bbox=dict(facecolor='white', alpha=0.8))
+
+ax.set_xlim(box_coords[0], box_coords[2])
+ax.set_ylim(box_coords[1], box_coords[3])
+ax.set_aspect('equal')
+ax.legend()
+
+plt.title("Waypoint-Based Survey Path")
+plt.savefig(f"two_drones_survey_path_waypoints.png")
+plt.close()

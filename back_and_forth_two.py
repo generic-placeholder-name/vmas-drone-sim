@@ -5,7 +5,7 @@ from shapely.ops import unary_union
 import networkx as nx
 
 #########################
-# Geometry and Pathfinding
+# Geometry and Pathfinding (No changes here)
 #########################
 
 def create_free_area(box_coords, obstacles):
@@ -82,7 +82,7 @@ def calculate_total_turn_angle(path):
     return total_turn
 
 #########################
-# Sweep Segment Generation
+# Sweep Segment Generation (No changes here)
 #########################
 
 def generate_sweep_segments(angle, radius, bounds, obstacles):
@@ -101,16 +101,16 @@ def generate_sweep_segments(angle, radius, bounds, obstacles):
     n = np.array([-np.sin(angle), np.cos(angle)])
     
     # Determine offset range using box corners.
-    corners = np.array([[box_coords[0], box_coords[1]],
-                        [box_coords[0], box_coords[3]],
-                        [box_coords[2], box_coords[1]],
-                        [box_coords[2], box_coords[3]]])
+    corners = np.array([[bounds[0], bounds[1]],
+                        [bounds[0], bounds[3]],
+                        [bounds[2], bounds[1]],
+                        [bounds[2], bounds[3]]])
     projections = corners.dot(n)
     c_min, c_max = projections.min(), projections.max()
     
     offsets = np.arange(c_min, c_max + 2*radius, 2*radius)
     segments = []
-    far = max(box_coords[2]-box_coords[0], box_coords[3]-box_coords[1]) * 2
+    far = max(bounds[2]-bounds[0], bounds[3]-bounds[1]) * 2
     
     for c in offsets:
         p0 = c * n
@@ -135,13 +135,13 @@ def generate_sweep_segments(angle, radius, bounds, obstacles):
                 trimmed = LineString([tuple(pt_start), tuple(pt_end)])
             else:
                 mid = seg.interpolate(0.5, normalized=True)
-                trimmed = LineString([mid, mid]) # Duplicating the point is a bit better.
+                trimmed = LineString([mid, mid])  # Duplicate midpoint to form a zero-length line
             segments.append(trimmed)
 
     return segments, free_area
 
 #########################
-# Merging Lines by Connecting Closest Endpoints
+# Merging Lines by Connecting Closest Endpoints (No changes here)
 #########################
 
 def merge_all_lines(lines, free_area, obstacles, num_iterations=10):
@@ -239,15 +239,15 @@ def merge_all_lines(lines, free_area, obstacles, num_iterations=10):
     return LineString(best_full_path_coords)
 
 #########################
-# Main: Generate Sweep Segments and Merge Them
+# Main: Generate Sweep Segments and Merge Them for Two Drones
 #########################
 
-def generate_tour(box_coords, obstacles, base_point, survey_radius, angle):
+def generate_tour(sub_box_coords, obstacles, base_point, survey_radius, angle):
     """
-    Generate a full tour of the box (given by box_coords), avoiding obstacles, using back-and-forth heuristic.
+    Generate a full tour for a sub-box, avoiding obstacles, using back-and-forth heuristic.
     """
     # Generate sweep segments.
-    segments, free_area = generate_sweep_segments(angle, survey_radius, box_coords, obstacles)
+    segments, free_area = generate_sweep_segments(angle, survey_radius, sub_box_coords, obstacles)
     segments.append(LineString([base_point, base_point]))
     # Merge all lines into one closed loop.
     try:
@@ -256,54 +256,121 @@ def generate_tour(box_coords, obstacles, base_point, survey_radius, angle):
         raise Exception(f"Error during merging: {e}")
     return full_closed_path
 
-# Parameters.
-box_coords = (0, 0, 800, 620)  # Survey area dimensions.
+# Split survey area
+box_coords = (0, 0, 800, 620)
+split_x = 460
+left_box = (0, 0, split_x, 620)
+right_box = (split_x, 0, 800, 620)
+
 obstacles = [
-    (350, 120, 426, 220),  
-    (485, 280, 525, 378),   
+    (350, 120, 426, 220),
+    (485, 280, 525, 378),
     (350, 20, 400, 70),
     (175, 420, 225, 470),
 ]
-survey_radius = 25           # Drone's survey radius.
-base_point = (450, 200)  # You may choose a base point. (475, 200)
+survey_radius = 25
+base_point1 = (450, 200)
+base_point2 = (475, 200)
 
-#########################
-# Report and Visualization
-#########################
+# Precompute best paths for each sub-area independently
+best_left = {angle: None for angle in range(0, 91, 10)}
+best_right = {angle: None for angle in range(0, 91, 10)}
 
+# Find best path for left sub-area at each angle
+print("Optimizing left sub-area...")
 for angle in range(0, 91, 10):
-    try: 
-        full_closed_path = generate_tour(box_coords, obstacles, base_point, survey_radius, np.radians(angle))
-        total_length = full_closed_path.length
-        total_turn_angle = calculate_total_turn_angle(full_closed_path)
-
-        # Visualization.
-        fig, ax = plt.subplots(figsize=(8,8))
-        
-        # Plot free area.
-        x_free, y_free = shapely_box(*box_coords).exterior.xy
-        ax.fill(x_free, y_free, alpha=0.2, fc='green', ec='green')
-        
-        # Plot obstacles.
-        for obs in obstacles:
-            obs_poly = shapely_box(*obs)
-            x_obs, y_obs = obs_poly.exterior.xy
-            ax.fill(x_obs, y_obs, alpha=0.5, fc='gray', ec='gray')
-        
-        # Plot the full closed path.
-        x_path, y_path = full_closed_path.xy
-        ax.plot(x_path, y_path, 'r--', lw=2, label='Merged Survey Path')
-        
-        ax.set_xlim(box_coords[0]-5, box_coords[2]+5)
-        ax.set_ylim(box_coords[1]-5, box_coords[3]+5)
-        ax.set_aspect('equal')
-        ax.legend()
-        plt.title(f"Angle: {angle:.1f}° | Total Path Length: {total_length:.1f} | Total Turn Angle: {total_turn_angle:.1f}°")
-        plt.savefig(f"drone_merged_survey_path_{angle:.1f}.png")
-        plt.close()
-        
-        print(f"Total path length: {total_length:.1f}")
-        print(f"Total turning angle: {total_turn_angle:.1f}°")
-        print("Plot saved as 'drone_merged_survey_path.png'. Open it to view the survey path.")
+    try:
+        path = generate_tour(left_box, obstacles, base_point1, survey_radius, np.radians(angle))
+        best_left[angle] = {
+            'path': path,
+            'length': path.length,
+            'turn_angle': calculate_total_turn_angle(path)
+        }
+        print(f"Left {angle}°: {path.length:.1f} units")
     except Exception as e:
-        print("Exception encountered:", e)
+        print(f"Left {angle}° failed: {e}")
+        best_left[angle] = None
+
+# Find best path for right sub-area at each angle  
+print("\nOptimizing right sub-area...")
+for angle in range(0, 91, 10):
+    try:
+        path = generate_tour(right_box, obstacles, base_point2, survey_radius, np.radians(angle))
+        best_right[angle] = {
+            'path': path,
+            'length': path.length,
+            'turn_angle': calculate_total_turn_angle(path)
+        }
+        print(f"Right {angle}°: {path.length:.1f} units")
+    except Exception as e:
+        print(f"Right {angle}° failed: {e}")
+        best_right[angle] = None
+
+# Find best combination of angles
+best_total = float('inf')
+best_angles = (None, None)
+
+for left_angle in range(0, 91, 10):
+    for right_angle in range(0, 91, 10):
+        if best_left[left_angle] and best_right[right_angle]:
+            total_length = (best_left[left_angle]['length'] + 
+                          best_right[right_angle]['length'])
+            if total_length < best_total:
+                best_total = total_length
+                best_angles = (left_angle, right_angle)
+
+# Get best paths
+best_left_path = best_left[best_angles[0]]['path']
+best_right_path = best_right[best_angles[1]]['path']
+total_turn = (best_left[best_angles[0]]['turn_angle'] + 
+            best_right[best_angles[1]]['turn_angle'])
+
+# Visualization of best combination with individual stats
+fig, ax = plt.subplots(figsize=(8,8))
+free_area = create_free_area(box_coords, obstacles)
+x_free, y_free = free_area.exterior.xy
+ax.fill(x_free, y_free, alpha=0.2, fc='green', ec='green')
+
+# Plot obstacles
+for obs in obstacles:
+    obs_poly = shapely_box(*obs)
+    x_obs, y_obs = obs_poly.exterior.xy
+    ax.fill(x_obs, y_obs, alpha=0.5, fc='gray', ec='gray')
+
+# Plot paths
+x1, y1 = best_left_path.xy
+ax.plot(x1, y1, 'r--', lw=2, label=f'Drone 1 ({best_angles[0]}°)')
+x2, y2 = best_right_path.xy
+ax.plot(x2, y2, 'b--', lw=2, label=f'Drone 2 ({best_angles[1]}°)')
+
+# Plot base points and split line
+ax.axvline(x=split_x, color='blue', linestyle=':', linewidth=1)
+ax.scatter(*base_point1, c='red', s=100, label='Base 1')
+ax.scatter(*base_point2, c='blue', s=100, label='Base 2')
+
+# Add text annotations with metrics
+left_stats = (f"Drone 1 ({best_angles[0]}°):\n"
+             f"Length: {best_left[best_angles[0]]['length']:.1f}\n"
+             f"Turn: {best_left[best_angles[0]]['turn_angle']:.1f}°")
+
+right_stats = (f"Drone 2 ({best_angles[1]}°):\n"
+              f"Length: {best_right[best_angles[1]]['length']:.1f}\n"
+              f"Turn: {best_right[best_angles[1]]['turn_angle']:.1f}°")
+
+total_stats = (f"Combined Total:\n"
+              f"Length: {best_total:.1f}\n"
+              f"Turn: {total_turn:.1f}°")
+
+ax.text(0.02, 0.98, left_stats, transform=ax.transAxes,
+        verticalalignment='top', color='red')
+ax.text(0.55, 0.98, right_stats, transform=ax.transAxes, 
+        verticalalignment='top', color='blue')
+ax.text(0.35, 0.02, total_stats, transform=ax.transAxes,
+        verticalalignment='bottom', horizontalalignment='center')
+
+ax.set_xlim(box_coords[0]-5, box_coords[2]+5)
+ax.set_ylim(box_coords[1]-5, box_coords[3]+5)
+ax.set_aspect('equal')
+ax.legend(loc='lower left')
+plt.savefig("two_drones_optimized_path_with_individual_stats.png")
+plt.show()
