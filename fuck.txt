@@ -1,0 +1,606 @@
+Start point: POINT (450 200)
+End point: POINT (25 25)
+[<POINT (450 200)>, (431.0, 225.0), (345.0, 225.0), <POINT (25 25)>]
+Start point: POINT (450 200)
+End point: POINT (25 75)
+[<POINT (450 200)>, (431.0, 225.0), (345.0, 225.0), <POINT (25 75)>]
+Start point: POINT (450 200)
+End point: POINT (25 125)
+[<POINT (450 200)>, (431.0, 225.0), (345.0, 225.0), <POINT (25 125)>]
+Start point: POINT (450 200)
+End point: POINT (25 175)
+[<POINT (450 200)>, (431.0, 225.0), (345.0, 225.0), <POINT (25 175)>]
+Start point: POINT (450 200)
+End point: POINT (25 225)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (25 225)>]
+Start point: POINT (450 200)
+End point: POINT (25 275)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (25 275)>]
+Start point: POINT (450 200)
+End point: POINT (25 325)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (25 325)>]
+Start point: POINT (450 200)
+End point: POINT (25 375)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (25 375)>]
+Start point: POINT (450 200)
+End point: POINT (25 425)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (25 425)>]
+Start point: POINT (450 200)
+End point: POINT (25 475)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (25 475)>]
+Start point: POINT (450 200)
+End point: POINT (25 525)
+[<POINT (450 200)>, (431.0, 225.0), (170.0, 415.0), <POINT (25 525)>]
+Start point: POINT (450 200)
+End point: POINT (25 575)
+[<POINT (450 200)>, (431.0, 225.0), (170.0, 415.0), <POINT (25 575)>]
+Start point: POINT (450 200)
+End point: POINT (75 25)
+[<POINT (450 200)>, (431.0, 225.0), (345.0, 225.0), <POINT (75 25)>]
+Start point: POINT (450 200)
+End point: POINT (75 75)
+[<POINT (450 200)>, (431.0, 225.0), (345.0, 225.0), <POINT (75 75)>]
+Start point: POINT (450 200)
+End point: POINT (75 125)
+[<POINT (450 200)>, (431.0, 225.0), (345.0, 225.0), <POINT (75 125)>]
+Start point: POINT (450 200)
+End point: POINT (75 175)
+[<POINT (450 200)>, (431.0, 225.0), (345.0, 225.0), <POINT (75 175)>]
+Start point: POINT (450 200)
+End point: POINT (75 225)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (75 225)>]
+Start point: POINT (450 200)
+End point: POINT (75 275)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (75 275)>]
+Start point: POINT (450 200)
+End point: POINT (75 325)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (75 325)>]
+Start point: POINT (450 200)
+End point: POINT (75 375)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (75 375)>]
+Start point: POINT (450 200)
+End point: POINT (75 425)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (75 425)>]
+Start point: POINT (450 200)
+End point: POINT (75 475)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (75 475)>]
+Start point: POINT (450 200)
+End point: POINT (75 525)
+[<POINT (450 200)>, (431.0, 225.0), (170.0, 415.0), <POINT (75 525)>]
+Start point: POINT (450 200)
+End point: POINT (75 575)
+[<POINT (450 200)>, (431.0, 225.0), (230.0, 475.0), <POINT (75 575)>]
+Start point: POINT (450 200)
+End point: POINT (125 25)
+[<POINT (450 200)>, (431.0, 115.0), <POINT (125 25)>]
+Start point: POINT (450 200)
+End point: POINT (125 75)
+[<POINT (450 200)>, (431.0, 225.0), (345.0, 225.0), <POINT (125 75)>]
+Start point: POINT (450 200)
+End point: POINT (125 125)
+[<POINT (450 200)>, (431.0, 225.0), (345.0, 225.0), <POINT (125 125)>]
+Start point: POINT (450 200)
+End point: POINT (125 175)
+[<POINT (450 200)>, (431.0, 225.0), (345.0, 225.0), <POINT (125 175)>]
+Start point: POINT (450 200)
+End point: POINT (125 225)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (125 225)>]
+Start point: POINT (450 200)
+End point: POINT (125 275)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (125 275)>]
+Start point: POINT (450 200)
+End point: POINT (125 325)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (125 325)>]
+Start point: POINT (450 200)
+End point: POINT (125 375)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (125 375)>]
+Start point: POINT (450 200)
+End point: POINT (125 425)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (125 425)>]
+Start point: POINT (450 200)
+End point: POINT (125 475)
+[<POINT (450 200)>, (431.0, 225.0), (170.0, 415.0), <POINT (125 475)>]
+Start point: POINT (450 200)
+End point: POINT (125 525)
+[<POINT (450 200)>, (431.0, 225.0), (230.0, 475.0), <POINT (125 525)>]
+Start point: POINT (450 200)
+End point: POINT (125 575)
+[<POINT (450 200)>, (431.0, 225.0), (230.0, 475.0), <POINT (125 575)>]
+Start point: POINT (450 200)
+End point: POINT (175 25)
+[<POINT (450 200)>, (431.0, 115.0), <POINT (175 25)>]
+Start point: POINT (450 200)
+End point: POINT (175 75)
+[<POINT (450 200)>, (431.0, 225.0), (345.0, 225.0), <POINT (175 75)>]
+Start point: POINT (450 200)
+End point: POINT (175 125)
+[<POINT (450 200)>, (431.0, 225.0), (345.0, 225.0), <POINT (175 125)>]
+Start point: POINT (450 200)
+End point: POINT (175 175)
+[<POINT (450 200)>, (431.0, 225.0), (345.0, 225.0), <POINT (175 175)>]
+Start point: POINT (450 200)
+End point: POINT (175 225)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (175 225)>]
+Start point: POINT (450 200)
+End point: POINT (175 275)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (175 275)>]
+Start point: POINT (450 200)
+End point: POINT (175 325)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (175 325)>]
+Start point: POINT (450 200)
+End point: POINT (175 375)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (175 375)>]
+Start point: POINT (450 200)
+End point: POINT (175 525)
+[<POINT (450 200)>, (431.0, 225.0), (230.0, 475.0), <POINT (175 525)>]
+Start point: POINT (450 200)
+End point: POINT (175 575)
+[<POINT (450 200)>, <POINT (175 575)>]
+Start point: POINT (450 200)
+End point: POINT (225 25)
+[<POINT (450 200)>, (431.0, 115.0), <POINT (225 25)>]
+Start point: POINT (450 200)
+End point: POINT (225 75)
+[<POINT (450 200)>, (431.0, 115.0), <POINT (225 75)>]
+Start point: POINT (450 200)
+End point: POINT (225 125)
+[<POINT (450 200)>, (431.0, 225.0), (345.0, 225.0), <POINT (225 125)>]
+Start point: POINT (450 200)
+End point: POINT (225 175)
+[<POINT (450 200)>, (431.0, 225.0), (345.0, 225.0), <POINT (225 175)>]
+Start point: POINT (450 200)
+End point: POINT (225 225)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (225 225)>]
+Start point: POINT (450 200)
+End point: POINT (225 275)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (225 275)>]
+Start point: POINT (450 200)
+End point: POINT (225 325)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (225 325)>]
+Start point: POINT (450 200)
+End point: POINT (225 375)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (225 375)>]
+Start point: POINT (450 200)
+End point: POINT (225 525)
+[<POINT (450 200)>, <POINT (225 525)>]
+Start point: POINT (450 200)
+End point: POINT (225 575)
+[<POINT (450 200)>, <POINT (225 575)>]
+Start point: POINT (450 200)
+End point: POINT (275 25)
+[<POINT (450 200)>, (431.0, 115.0), (345.0, 75.0), <POINT (275 25)>]
+Start point: POINT (450 200)
+End point: POINT (275 75)
+[<POINT (450 200)>, (431.0, 115.0), <POINT (275 75)>]
+Start point: POINT (450 200)
+End point: POINT (275 125)
+[<POINT (450 200)>, (431.0, 225.0), (345.0, 225.0), <POINT (275 125)>]
+Start point: POINT (450 200)
+End point: POINT (275 175)
+[<POINT (450 200)>, (431.0, 225.0), (345.0, 225.0), <POINT (275 175)>]
+Start point: POINT (450 200)
+End point: POINT (275 225)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (275 225)>]
+Start point: POINT (450 200)
+End point: POINT (275 275)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (275 275)>]
+Start point: POINT (450 200)
+End point: POINT (275 325)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (275 325)>]
+Start point: POINT (450 200)
+End point: POINT (275 375)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (275 375)>]
+Start point: POINT (450 200)
+End point: POINT (275 425)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (275 425)>]
+Start point: POINT (450 200)
+End point: POINT (275 475)
+[<POINT (450 200)>, <POINT (275 475)>]
+Start point: POINT (450 200)
+End point: POINT (275 525)
+[<POINT (450 200)>, <POINT (275 525)>]
+Start point: POINT (450 200)
+End point: POINT (275 575)
+[<POINT (450 200)>, <POINT (275 575)>]
+Start point: POINT (450 200)
+End point: POINT (325 25)
+[<POINT (450 200)>, (431.0, 115.0), (345.0, 75.0), <POINT (325 25)>]
+Start point: POINT (450 200)
+End point: POINT (325 75)
+[<POINT (450 200)>, (431.0, 115.0), <POINT (325 75)>]
+Start point: POINT (450 200)
+End point: POINT (325 125)
+[<POINT (450 200)>, (431.0, 115.0), (345.0, 115.0), <POINT (325 125)>]
+Start point: POINT (450 200)
+End point: POINT (325 175)
+[<POINT (450 200)>, (431.0, 225.0), (345.0, 225.0), <POINT (325 175)>]
+Start point: POINT (450 200)
+End point: POINT (325 225)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (325 225)>]
+Start point: POINT (450 200)
+End point: POINT (325 275)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (325 275)>]
+Start point: POINT (450 200)
+End point: POINT (325 325)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (325 325)>]
+Start point: POINT (450 200)
+End point: POINT (325 375)
+[<POINT (450 200)>, <POINT (325 375)>]
+Start point: POINT (450 200)
+End point: POINT (325 425)
+[<POINT (450 200)>, <POINT (325 425)>]
+Start point: POINT (450 200)
+End point: POINT (325 475)
+[<POINT (450 200)>, <POINT (325 475)>]
+Start point: POINT (450 200)
+End point: POINT (325 525)
+[<POINT (450 200)>, <POINT (325 525)>]
+Start point: POINT (450 200)
+End point: POINT (325 575)
+[<POINT (450 200)>, <POINT (325 575)>]
+Start point: POINT (450 200)
+End point: POINT (375 275)
+[<POINT (450 200)>, (431.0, 225.0), <POINT (375 275)>]
+Start point: POINT (450 200)
+End point: POINT (375 325)
+[<POINT (450 200)>, <POINT (375 325)>]
+Start point: POINT (450 200)
+End point: POINT (375 375)
+[<POINT (450 200)>, <POINT (375 375)>]
+Start point: POINT (450 200)
+End point: POINT (375 425)
+[<POINT (450 200)>, <POINT (375 425)>]
+Start point: POINT (450 200)
+End point: POINT (375 475)
+[<POINT (450 200)>, <POINT (375 475)>]
+Start point: POINT (450 200)
+End point: POINT (375 525)
+[<POINT (450 200)>, <POINT (375 525)>]
+Start point: POINT (450 200)
+End point: POINT (375 575)
+[<POINT (450 200)>, <POINT (375 575)>]
+Start point: POINT (450 200)
+End point: POINT (425 25)
+[<POINT (450 200)>, <POINT (425 25)>]
+Start point: POINT (450 200)
+End point: POINT (425 75)
+[<POINT (450 200)>, <POINT (425 75)>]
+Start point: POINT (450 200)
+End point: POINT (425 275)
+[<POINT (450 200)>, <POINT (425 275)>]
+Start point: POINT (450 200)
+End point: POINT (425 325)
+[<POINT (450 200)>, <POINT (425 325)>]
+Start point: POINT (450 200)
+End point: POINT (425 375)
+[<POINT (450 200)>, <POINT (425 375)>]
+Start point: POINT (450 200)
+End point: POINT (425 425)
+[<POINT (450 200)>, <POINT (425 425)>]
+Start point: POINT (450 200)
+End point: POINT (425 475)
+[<POINT (450 200)>, <POINT (425 475)>]
+Start point: POINT (450 200)
+End point: POINT (425 525)
+[<POINT (450 200)>, <POINT (425 525)>]
+Start point: POINT (450 200)
+End point: POINT (425 575)
+[<POINT (450 200)>, <POINT (425 575)>]
+Start point: POINT (425 275)
+End point: POINT (175 525)
+[<POINT (425 275)>, (230.0, 475.0), <POINT (175 525)>]
+Start point: POINT (425 275)
+End point: POINT (225 525)
+[<POINT (425 275)>, <POINT (225 525)>]
+Start point: POINT (425 275)
+End point: POINT (275 525)
+[<POINT (425 275)>, <POINT (275 525)>]
+Start point: POINT (425 275)
+End point: POINT (325 525)
+[<POINT (425 275)>, <POINT (325 525)>]
+Start point: POINT (425 275)
+End point: POINT (375 275)
+[<POINT (425 275)>, <POINT (375 275)>]
+Start point: POINT (425 275)
+End point: POINT (375 325)
+[<POINT (425 275)>, <POINT (375 325)>]
+Start point: POINT (425 275)
+End point: POINT (375 375)
+[<POINT (425 275)>, <POINT (375 375)>]
+Start point: POINT (425 275)
+End point: POINT (375 425)
+[<POINT (425 275)>, <POINT (375 425)>]
+Start point: POINT (425 275)
+End point: POINT (375 475)
+[<POINT (425 275)>, <POINT (375 475)>]
+Start point: POINT (425 275)
+End point: POINT (375 525)
+[<POINT (425 275)>, <POINT (375 525)>]
+Start point: POINT (425 275)
+End point: POINT (425 25)
+[<POINT (425 275)>, (431.0, 225.0), (431.0, 115.0), <POINT (425 25)>]
+Start point: POINT (425 275)
+End point: POINT (425 75)
+[<POINT (425 275)>, (431.0, 225.0), (431.0, 115.0), <POINT (425 75)>]
+Start point: POINT (425 275)
+End point: POINT (425 25)
+[<POINT (425 275)>, (431.0, 225.0), (431.0, 115.0), <POINT (425 25)>]
+Start point: POINT (425 275)
+End point: POINT (425 75)
+[<POINT (425 275)>, (431.0, 225.0), (431.0, 115.0), <POINT (425 75)>]
+Start point: POINT (425 25)
+End point: POINT (450 200)
+[<POINT (425 25)>, <POINT (450 200)>]
+Start point: POINT (475 200)
+End point: POINT (475 25)
+[<POINT (475 200)>, <POINT (475 25)>]
+Start point: POINT (475 200)
+End point: POINT (475 75)
+[<POINT (475 200)>, <POINT (475 75)>]
+Start point: POINT (475 200)
+End point: POINT (475 125)
+[<POINT (475 200)>, <POINT (475 125)>]
+Start point: POINT (475 200)
+End point: POINT (475 175)
+[<POINT (475 200)>, <POINT (475 175)>]
+Start point: POINT (475 200)
+End point: POINT (475 225)
+[<POINT (475 200)>, <POINT (475 225)>]
+Start point: POINT (475 200)
+End point: POINT (475 275)
+[<POINT (475 200)>, <POINT (475 275)>]
+Start point: POINT (475 200)
+End point: POINT (475 325)
+[<POINT (475 200)>, <POINT (475 325)>]
+Start point: POINT (475 200)
+End point: POINT (475 375)
+[<POINT (475 200)>, <POINT (475 375)>]
+Start point: POINT (475 200)
+End point: POINT (475 425)
+[<POINT (475 200)>, <POINT (475 425)>]
+Start point: POINT (475 200)
+End point: POINT (475 475)
+[<POINT (475 200)>, <POINT (475 475)>]
+Start point: POINT (475 200)
+End point: POINT (475 525)
+[<POINT (475 200)>, <POINT (475 525)>]
+Start point: POINT (475 200)
+End point: POINT (475 575)
+[<POINT (475 200)>, <POINT (475 575)>]
+Start point: POINT (475 200)
+End point: POINT (525 25)
+[<POINT (475 200)>, <POINT (525 25)>]
+Start point: POINT (475 200)
+End point: POINT (525 75)
+[<POINT (475 200)>, <POINT (525 75)>]
+Start point: POINT (475 200)
+End point: POINT (525 125)
+[<POINT (475 200)>, <POINT (525 125)>]
+Start point: POINT (475 200)
+End point: POINT (525 175)
+[<POINT (475 200)>, <POINT (525 175)>]
+Start point: POINT (475 200)
+End point: POINT (525 225)
+[<POINT (475 200)>, <POINT (525 225)>]
+Start point: POINT (475 200)
+End point: POINT (525 425)
+[<POINT (475 200)>, (530.0, 275.0), (530.0, 383.0), <POINT (525 425)>]
+Start point: POINT (475 200)
+End point: POINT (525 475)
+[<POINT (475 200)>, (480.0, 383.0), <POINT (525 475)>]
+Start point: POINT (475 200)
+End point: POINT (525 525)
+[<POINT (475 200)>, (480.0, 383.0), <POINT (525 525)>]
+Start point: POINT (475 200)
+End point: POINT (525 575)
+[<POINT (475 200)>, (480.0, 383.0), <POINT (525 575)>]
+Start point: POINT (475 200)
+End point: POINT (575 25)
+[<POINT (475 200)>, <POINT (575 25)>]
+Start point: POINT (475 200)
+End point: POINT (575 75)
+[<POINT (475 200)>, <POINT (575 75)>]
+Start point: POINT (475 200)
+End point: POINT (575 125)
+[<POINT (475 200)>, <POINT (575 125)>]
+Start point: POINT (475 200)
+End point: POINT (575 175)
+[<POINT (475 200)>, <POINT (575 175)>]
+Start point: POINT (475 200)
+End point: POINT (575 225)
+[<POINT (475 200)>, <POINT (575 225)>]
+Start point: POINT (475 200)
+End point: POINT (575 275)
+[<POINT (475 200)>, <POINT (575 275)>]
+Start point: POINT (475 200)
+End point: POINT (575 325)
+[<POINT (475 200)>, <POINT (575 325)>]
+Start point: POINT (475 200)
+End point: POINT (575 375)
+[<POINT (475 200)>, (530.0, 275.0), <POINT (575 375)>]
+Start point: POINT (475 200)
+End point: POINT (575 425)
+[<POINT (475 200)>, (530.0, 275.0), <POINT (575 425)>]
+Start point: POINT (475 200)
+End point: POINT (575 475)
+[<POINT (475 200)>, (530.0, 275.0), <POINT (575 475)>]
+Start point: POINT (475 200)
+End point: POINT (575 525)
+[<POINT (475 200)>, (530.0, 275.0), <POINT (575 525)>]
+Start point: POINT (475 200)
+End point: POINT (575 575)
+[<POINT (475 200)>, (530.0, 275.0), <POINT (575 575)>]
+Start point: POINT (475 200)
+End point: POINT (625 25)
+[<POINT (475 200)>, <POINT (625 25)>]
+Start point: POINT (475 200)
+End point: POINT (625 75)
+[<POINT (475 200)>, <POINT (625 75)>]
+Start point: POINT (475 200)
+End point: POINT (625 125)
+[<POINT (475 200)>, <POINT (625 125)>]
+Start point: POINT (475 200)
+End point: POINT (625 175)
+[<POINT (475 200)>, <POINT (625 175)>]
+Start point: POINT (475 200)
+End point: POINT (625 225)
+[<POINT (475 200)>, <POINT (625 225)>]
+Start point: POINT (475 200)
+End point: POINT (625 275)
+[<POINT (475 200)>, <POINT (625 275)>]
+Start point: POINT (475 200)
+End point: POINT (625 325)
+[<POINT (475 200)>, <POINT (625 325)>]
+Start point: POINT (475 200)
+End point: POINT (625 375)
+[<POINT (475 200)>, <POINT (625 375)>]
+Start point: POINT (475 200)
+End point: POINT (625 425)
+[<POINT (475 200)>, (530.0, 275.0), <POINT (625 425)>]
+Start point: POINT (475 200)
+End point: POINT (625 475)
+[<POINT (475 200)>, (530.0, 275.0), <POINT (625 475)>]
+Start point: POINT (475 200)
+End point: POINT (625 525)
+[<POINT (475 200)>, (530.0, 275.0), <POINT (625 525)>]
+Start point: POINT (475 200)
+End point: POINT (625 575)
+[<POINT (475 200)>, (530.0, 275.0), <POINT (625 575)>]
+Start point: POINT (475 200)
+End point: POINT (675 25)
+[<POINT (475 200)>, <POINT (675 25)>]
+Start point: POINT (475 200)
+End point: POINT (675 75)
+[<POINT (475 200)>, <POINT (675 75)>]
+Start point: POINT (475 200)
+End point: POINT (675 125)
+[<POINT (475 200)>, <POINT (675 125)>]
+Start point: POINT (475 200)
+End point: POINT (675 175)
+[<POINT (475 200)>, <POINT (675 175)>]
+Start point: POINT (475 200)
+End point: POINT (675 225)
+[<POINT (475 200)>, <POINT (675 225)>]
+Start point: POINT (475 200)
+End point: POINT (675 275)
+[<POINT (475 200)>, <POINT (675 275)>]
+Start point: POINT (475 200)
+End point: POINT (675 325)
+[<POINT (475 200)>, <POINT (675 325)>]
+Start point: POINT (475 200)
+End point: POINT (675 375)
+[<POINT (475 200)>, <POINT (675 375)>]
+Start point: POINT (475 200)
+End point: POINT (675 425)
+[<POINT (475 200)>, <POINT (675 425)>]
+Start point: POINT (475 200)
+End point: POINT (675 475)
+[<POINT (475 200)>, (530.0, 275.0), <POINT (675 475)>]
+Start point: POINT (475 200)
+End point: POINT (675 525)
+[<POINT (475 200)>, (530.0, 275.0), <POINT (675 525)>]
+Start point: POINT (475 200)
+End point: POINT (675 575)
+[<POINT (475 200)>, (530.0, 275.0), <POINT (675 575)>]
+Start point: POINT (475 200)
+End point: POINT (725 25)
+[<POINT (475 200)>, <POINT (725 25)>]
+Start point: POINT (475 200)
+End point: POINT (725 75)
+[<POINT (475 200)>, <POINT (725 75)>]
+Start point: POINT (475 200)
+End point: POINT (725 125)
+[<POINT (475 200)>, <POINT (725 125)>]
+Start point: POINT (475 200)
+End point: POINT (725 175)
+[<POINT (475 200)>, <POINT (725 175)>]
+Start point: POINT (475 200)
+End point: POINT (725 225)
+[<POINT (475 200)>, <POINT (725 225)>]
+Start point: POINT (475 200)
+End point: POINT (725 275)
+[<POINT (475 200)>, <POINT (725 275)>]
+Start point: POINT (475 200)
+End point: POINT (725 325)
+[<POINT (475 200)>, <POINT (725 325)>]
+Start point: POINT (475 200)
+End point: POINT (725 375)
+[<POINT (475 200)>, <POINT (725 375)>]
+Start point: POINT (475 200)
+End point: POINT (725 425)
+[<POINT (475 200)>, <POINT (725 425)>]
+Start point: POINT (475 200)
+End point: POINT (725 475)
+[<POINT (475 200)>, <POINT (725 475)>]
+Start point: POINT (475 200)
+End point: POINT (725 525)
+[<POINT (475 200)>, <POINT (725 525)>]
+Start point: POINT (475 200)
+End point: POINT (725 575)
+[<POINT (475 200)>, (530.0, 275.0), <POINT (725 575)>]
+Start point: POINT (475 200)
+End point: POINT (775 25)
+[<POINT (475 200)>, <POINT (775 25)>]
+Start point: POINT (475 200)
+End point: POINT (775 75)
+[<POINT (475 200)>, <POINT (775 75)>]
+Start point: POINT (475 200)
+End point: POINT (775 125)
+[<POINT (475 200)>, <POINT (775 125)>]
+Start point: POINT (475 200)
+End point: POINT (775 175)
+[<POINT (475 200)>, <POINT (775 175)>]
+Start point: POINT (475 200)
+End point: POINT (775 225)
+[<POINT (475 200)>, <POINT (775 225)>]
+Start point: POINT (475 200)
+End point: POINT (775 275)
+[<POINT (475 200)>, <POINT (775 275)>]
+Start point: POINT (475 200)
+End point: POINT (775 325)
+[<POINT (475 200)>, <POINT (775 325)>]
+Start point: POINT (475 200)
+End point: POINT (775 375)
+[<POINT (475 200)>, <POINT (775 375)>]
+Start point: POINT (475 200)
+End point: POINT (775 425)
+[<POINT (475 200)>, <POINT (775 425)>]
+Start point: POINT (475 200)
+End point: POINT (775 475)
+[<POINT (475 200)>, <POINT (775 475)>]
+Start point: POINT (475 200)
+End point: POINT (775 525)
+[<POINT (475 200)>, <POINT (775 525)>]
+Start point: POINT (475 200)
+End point: POINT (775 575)
+[<POINT (475 200)>, <POINT (775 575)>]
+Start point: POINT (475 175)
+End point: POINT (475 25)
+[<POINT (475 175)>, <POINT (475 25)>]
+Start point: POINT (475 175)
+End point: POINT (475 75)
+[<POINT (475 175)>, <POINT (475 75)>]
+Start point: POINT (475 175)
+End point: POINT (475 125)
+[<POINT (475 175)>, <POINT (475 125)>]
+Start point: POINT (475 175)
+End point: POINT (525 425)
+[<POINT (475 175)>, (530.0, 275.0), (530.0, 383.0), <POINT (525 425)>]
+Start point: POINT (475 175)
+End point: POINT (525 475)
+[<POINT (475 175)>, (480.0, 383.0), <POINT (525 475)>]
+Start point: POINT (475 175)
+End point: POINT (525 525)
+[<POINT (475 175)>, (480.0, 383.0), <POINT (525 525)>]
+Start point: POINT (475 175)
+End point: POINT (525 425)
+[<POINT (475 175)>, (530.0, 275.0), (530.0, 383.0), <POINT (525 425)>]
+Start point: POINT (475 175)
+End point: POINT (525 475)
+[<POINT (475 175)>, (480.0, 383.0), <POINT (525 475)>]
+Start point: POINT (475 175)
+End point: POINT (525 525)
+[<POINT (475 175)>, (480.0, 383.0), <POINT (525 525)>]
+Start point: POINT (525 525)
+End point: POINT (475 200)
+[<POINT (525 525)>, (480.0, 383.0), <POINT (475 200)>]

@@ -86,7 +86,7 @@ def calculate_total_turn_angle(path):
 # Merging Lines by Connecting Closest Endpoints (No changes here)
 #########################
 
-def merge_all_lines(lines, free_area, obstacles, num_iterations=10):
+def merge_all_lines(lines, free_area, obstacles, num_iterations=50):
     # Precompute segments and points from input lines.
     segments_orig = []
     points = []
@@ -159,6 +159,40 @@ def merge_all_lines(lines, free_area, obstacles, num_iterations=10):
 
         # Only one merged segment remains.
         final_seg = segments[0]
+
+        # Do 2-opt optimization on the merged segment. 
+        # Since the tour is made up of 2-point segments, we do 2-opt on 2 points at a time.
+        # This is a simple greedy approach, not the most efficient.
+        assert(len(final_seg) % 2 == 0), "Final segment should have an even number of points."
+        for i in range(0, len(final_seg), 2):
+            for j in range(i + 4, len(final_seg), 2): # The implementation has problems with consecutive segments, so we just skip them.
+                # Check if swapping improves the path.
+                a = final_seg[i]
+                b = final_seg[i + 1]
+                c = final_seg[j]
+                d = final_seg[j + 1]
+                original_cost = (
+                    dist[final_seg[(i - 1) % len(final_seg)]][a] + dist[b][final_seg[(i + 2) % len(final_seg)]] +
+                    dist[final_seg[(j - 1) % len(final_seg)]][c] + dist[d][final_seg[(j + 2) % len(final_seg)]]
+                )
+                swap_ac_bd_cost = (
+                    dist[final_seg[(i - 1) % len(final_seg)]][c] + dist[d][final_seg[(i + 2) % len(final_seg)]] +
+                    dist[final_seg[(j - 1) % len(final_seg)]][a] + dist[b][final_seg[(j + 2) % len(final_seg)]]
+                )
+                swap_ad_bc_cost = (
+                    dist[final_seg[(i - 1) % len(final_seg)]][d] + dist[c][final_seg[(i + 2) % len(final_seg)]] +
+                    dist[final_seg[(j - 1) % len(final_seg)]][b] + dist[a][final_seg[(j + 2) % len(final_seg)]]
+                )
+
+                if swap_ac_bd_cost < original_cost and swap_ac_bd_cost < swap_ad_bc_cost:
+                    # Swap a-c and b-d
+                    final_seg[i], final_seg[j] = final_seg[j], final_seg[i]
+                    final_seg[i + 1], final_seg[j + 1] = final_seg[j + 1], final_seg[i + 1]
+                elif swap_ad_bc_cost < original_cost:
+                    # Swap a-d and b-c
+                    final_seg[i + 1], final_seg[j] = final_seg[j], final_seg[i + 1]
+                    final_seg[i], final_seg[j + 1] = final_seg[j + 1], final_seg[i]
+
         full_path_coords = []
         for i in range(len(final_seg)):
             cur = final_seg[i]
@@ -208,7 +242,7 @@ def create_vertical_lines(waypoints, survey_radius, free_area):
             last_y = current_segment[-1]
             test_line = LineString([(x, last_y), (x, y)])
             
-            if free_area.contains(test_line):
+            if free_area.covers(test_line):
                 # Continue current segment
                 current_segment.append(y)
             else:
@@ -255,10 +289,9 @@ def _finalize_segment(x, y_values, segments, radius, free_area):
             segments.append(LineString([mid, mid]))
 
 # Modified grid generation with obstacle checking
-def generate_grid_waypoints(box_coords, obstacles, survey_radius):
+def generate_grid_waypoints(box_coords, obstacles, grid_res):
     world_width = box_coords[2] - box_coords[0]
     world_height = box_coords[3] - box_coords[1]
-    grid_res = min(world_width, world_height) // 5
     
     waypoints = []
     free_area = create_free_area(box_coords, obstacles)
@@ -299,10 +332,16 @@ obstacles = [
     (350, 20, 400, 70),
     (175, 420, 225, 470),
 ]
-survey_radius = 25
+obs_tolerance = 5
+survey_radius = 25 # 620 // 5
+
+big_obstacles = [
+    (x1 - obs_tolerance, y1 - obs_tolerance, x2 + obs_tolerance, y2 + obs_tolerance)
+    for (x1, y1, x2, y2) in obstacles
+]
 
 # Generate waypoints
-waypoints, free_area = generate_grid_waypoints(box_coords, obstacles, survey_radius)
+waypoints, free_area = generate_grid_waypoints(box_coords, big_obstacles, survey_radius*2)
 
 # Split waypoints between drones
 left_waypoints = [p for p in waypoints if p[0] <= split_x]
@@ -311,8 +350,8 @@ right_waypoints = [p for p in waypoints if p[0] > split_x]
 # Generate paths
 base1 = (450, 200)
 base2 = (475, 200)
-path1 = generate_drone_path(left_waypoints, base1, survey_radius, free_area, obstacles)
-path2 = generate_drone_path(right_waypoints, base2, survey_radius, free_area, obstacles)
+path1 = generate_drone_path(left_waypoints, base1, survey_radius, free_area, big_obstacles)
+path2 = generate_drone_path(right_waypoints, base2, survey_radius, free_area, big_obstacles)
 
 # Visualization
 fig, ax = plt.subplots(figsize=(10, 8))
@@ -338,6 +377,9 @@ if path2:
     x2, y2 = path2.xy
     ax.plot(x2, y2, 'b-', lw=2, label='Drone 2 Path')
 
+# Move legend to the bottom of the graph
+ax.legend(loc='lower center', bbox_to_anchor=(0.5, -0.1), ncol=3)
+
 # Add metrics
 stats = []
 if path1:
@@ -355,5 +397,5 @@ ax.set_aspect('equal')
 ax.legend()
 
 plt.title("Waypoint-Based Survey Path")
-plt.savefig(f"two_drones_survey_path_waypoints.png")
+plt.savefig(f"two_drones_survey_path_waypoints_{survey_radius}.png")
 plt.close()
