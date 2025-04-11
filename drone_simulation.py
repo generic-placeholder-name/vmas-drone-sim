@@ -24,26 +24,22 @@ original_bottom_right = [245, 190]
 
 original_width = original_bottom_right[0] - original_top_left[0]
 original_height = original_bottom_right[1] - original_top_left[1]
-scale_x = 1 / min(original_width, original_height)
-scale_y = 1 / min(original_width, original_height)
-offset_x = original_top_left[0]
-offset_y = original_top_left[1]
+
+# Find the center of the original region
+center_x = (original_top_left[0] + original_bottom_right[0]) / 2
+center_y = (original_top_left[1] + original_bottom_right[1]) / 2
+
+# Scale based on shorter side to fit within [-1, 1]
+scale = 2 / min(original_width, original_height)
 
 def scale_coordinate(coord):
     x, y = coord
-    scaled_x = (x - offset_x) * scale_x
-    scaled_y = (y - offset_y) * scale_y
-    scaled_x = scaled_x * 2 - (original_width * scale_x)
-    scaled_y = scaled_y * 2 - (original_height * scale_y)
-    return [scaled_x, scaled_y]
+    return [(x - center_x) * scale, (y - center_y) * scale]
 
 def convert_to_original_units(scaled_coord):
-    scaled_x, scaled_y = scaled_coord
-    scaled_x = (scaled_x + (original_width * scale_x)) / 2
-    scaled_y = (scaled_y + (original_height * scale_y)) / 2
-    x = scaled_x / scale_x + offset_x
-    y = scaled_y / scale_y + offset_y
-    return [x, y]
+    x, y = scaled_coord
+    return [x / scale + center_x, y / scale + center_y]
+
 
 envConfig = {
     "borders": {
