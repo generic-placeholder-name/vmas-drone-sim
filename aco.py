@@ -345,14 +345,14 @@ if __name__ == "__main__":
 
     print("\nfirst tour costs\n")
     print(f"Total distance: {aco1.best_tour_distance}")
-    print(f"Total radians rotated: {aco1.best_tour_rotation}")
+    print(f"Total degrees rotated: {aco1.best_tour_rotation}")
     print(f"Performance: {heuristic(aco1.best_tour_distance, aco1.best_tour_rotation)}")
     print(f"Number of waypoints visited: {len(aco1.best_tour_nodes[1:])} out of {len(aco1.graph.waypoints)}")
     print(f"Returned to start node: {aco1.best_tour_nodes[0] == aco1.best_tour_nodes[-1]}")
 
     print("\nsecond tour costs\n")
     print(f"Total distance: {aco2.best_tour_distance}")
-    print(f"Total radians rotated: {aco2.best_tour_rotation}")
+    print(f"Total degrees rotated: {aco2.best_tour_rotation}")
     print(f"Performance: {heuristic(aco2.best_tour_distance, aco2.best_tour_rotation)}")
     print(f"Number of waypoints visited: {len(aco2.best_tour_nodes[1:])} out of {len(aco2.graph.waypoints)}")
     print(f"Returned to start node: {aco1.best_tour_nodes[0] == aco1.best_tour_nodes[-1]}")
