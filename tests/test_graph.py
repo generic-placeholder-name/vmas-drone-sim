@@ -133,9 +133,9 @@ def elbow3_reverse(edge_w1_w4, edge_w3_w4):
 
 def test_elbow_rotation(elbow1, elbow2, elbow3, edge_w1_w2, edge_w2_w3, edge_w1_w3, edge_w3_w4, edge_w2_w4, edge_w1_w4):
     # Use law of cosine to check angle
-    assert elbow1.rotation() == torch.pi - torch.arccos((edge_w1_w2.length**2 + edge_w2_w3.length**2 - edge_w1_w3.length**2) / (2 * edge_w1_w2.length * edge_w2_w3.length))
-    assert elbow2.rotation() == torch.pi - torch.arccos((edge_w2_w3.length**2 + edge_w3_w4.length**2 - edge_w2_w4.length**2) / (2 * edge_w2_w3.length * edge_w3_w4.length))
-    assert elbow3.rotation() == torch.pi - torch.arccos((edge_w3_w4.length**2 + edge_w1_w4.length**2 - edge_w1_w3.length**2) / (2 * edge_w3_w4.length * edge_w1_w4.length))
+    assert torch.isclose(elbow1.rotation(), (180/torch.pi) * (torch.pi - torch.arccos((edge_w1_w2.length**2 + edge_w2_w3.length**2 - edge_w1_w3.length**2) / (2 * edge_w1_w2.length * edge_w2_w3.length))))
+    assert torch.isclose(elbow2.rotation(), torch.rad2deg(torch.pi - torch.arccos((edge_w2_w3.length**2 + edge_w3_w4.length**2 - edge_w2_w4.length**2) / (2 * edge_w2_w3.length * edge_w3_w4.length))))
+    assert torch.isclose(elbow3.rotation(), torch.rad2deg(torch.pi - torch.arccos((edge_w3_w4.length**2 + edge_w1_w4.length**2 - edge_w1_w3.length**2) / (2 * edge_w3_w4.length * edge_w1_w4.length))))
     
 def test_reversed_elbows_are_equal(elbow1, elbow1_reverse, elbow2, elbow2_reverse, elbow3, elbow3_reverse):
     assert elbow1.rotation() == elbow1_reverse.rotation()
@@ -240,9 +240,9 @@ def test_get_edges_from_waypoint_tour(graph_with_generated_edges,
 def test_get_rotation(graph_with_generated_edges, edge_w1_w2, edge_w2_w3, edge_w3_w4, edge_w1_w4, edge_w1_w3, edge_w2_w4):
     # Verify that the correct rotations are generated
     assert graph_with_generated_edges.get_rotation(None, edge_w1_w2) == 0
-    assert graph_with_generated_edges.get_rotation(edge_w1_w2, edge_w2_w3) == torch.pi - torch.arccos((edge_w1_w2.length**2 + edge_w2_w3.length**2 - edge_w1_w3.length**2) / (2 * edge_w1_w2.length * edge_w2_w3.length))
-    assert graph_with_generated_edges.get_rotation(edge_w2_w3, edge_w3_w4) == torch.pi - torch.arccos((edge_w2_w3.length**2 + edge_w3_w4.length**2 - edge_w2_w4.length**2) / (2 * edge_w2_w3.length * edge_w3_w4.length))
-    assert graph_with_generated_edges.get_rotation(edge_w3_w4, edge_w1_w4) == torch.pi - torch.arccos((edge_w3_w4.length**2 + edge_w1_w4.length**2 - edge_w1_w3.length**2) / (2 * edge_w3_w4.length * edge_w1_w4.length))
+    assert torch.isclose(graph_with_generated_edges.get_rotation(edge_w1_w2, edge_w2_w3), torch.rad2deg(torch.pi - torch.arccos((edge_w1_w2.length**2 + edge_w2_w3.length**2 - edge_w1_w3.length**2) / (2 * edge_w1_w2.length * edge_w2_w3.length))))
+    assert torch.isclose(graph_with_generated_edges.get_rotation(edge_w2_w3, edge_w3_w4), torch.rad2deg(torch.pi - torch.arccos((edge_w2_w3.length**2 + edge_w3_w4.length**2 - edge_w2_w4.length**2) / (2 * edge_w2_w3.length * edge_w3_w4.length))))
+    assert torch.isclose(graph_with_generated_edges.get_rotation(edge_w3_w4, edge_w1_w4), (180 / torch.pi) * (torch.pi - torch.arccos((edge_w3_w4.length**2 + edge_w1_w4.length**2 - edge_w1_w3.length**2) / (2 * edge_w3_w4.length * edge_w1_w4.length))))
     # Check that when edges are flipped, rotation is the same
     assert graph_with_generated_edges.get_rotation(edge_w1_w2, edge_w2_w3) == graph_with_generated_edges.get_rotation(edge_w2_w3, edge_w1_w2)
     assert graph_with_generated_edges.get_rotation(edge_w2_w3, edge_w3_w4) == graph_with_generated_edges.get_rotation(edge_w3_w4, edge_w2_w3)

@@ -171,7 +171,7 @@ class Graph():
         return distance, rotation
 
     def get_rotation(self, previous_edge, edge):
-        """Return radians rotated after traversing previous edge and current edge"""
+        """Return degrees rotated after traversing previous edge and current edge"""
         assert previous_edge is None or isinstance(previous_edge, Edge), "previous_edge must be an edge"
         assert isinstance(edge, Edge), "edge must be an edge"
         if previous_edge is None:
@@ -358,7 +358,7 @@ class Elbow():
             raise ValueError(f"No common node found in edges. Nodes found: {self.previous_edge.node1}, {self.previous_edge.node2}, {self.edge.node1}, {self.edge.node2}")
         
     def angle(self):
-        """Calculate the angle (in radians) between the two edges."""
+        """Calculate the angle (in degrees) between the two edges."""
         # Get the direction vectors of the edges
         dir1 = self.point3 - self.point2
         dir2 = self.point1 - self.point2
@@ -369,10 +369,11 @@ class Elbow():
         
         # Calculate the angle using the dot product
         cos_theta = torch.dot(dir1, dir2)
-        return torch.acos(torch.clamp(cos_theta, -1.0, 1.0))
+        return torch.rad2deg(torch.acos(torch.clamp(cos_theta, -1.0, 1.0)))
     
     def rotation(self):
-        return torch.pi - self.angle()
+        """Calculates the exterior angle betwee the two edges in degrees, or the degrees a drone would have to rotate."""
+        return 180 - self.angle()
 
 def get_node_in_common(edge1, edge2):
     """Get the node in common between two edges."""
