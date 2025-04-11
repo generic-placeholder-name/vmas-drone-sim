@@ -20,7 +20,7 @@ if typing.TYPE_CHECKING:
 # original_bottom_right = [486, 253]
 # Changed to feet x feet of farm, measured from google maps
 original_top_left = [0, 0]
-original_bottom_right = [800, 620]
+original_bottom_right = [245, 190]
 
 original_width = original_bottom_right[0] - original_top_left[0]
 original_height = original_bottom_right[1] - original_top_left[1]
@@ -34,6 +34,12 @@ def scale_coordinate(coord):
     scaled_x = (x - offset_x) * scale_x
     scaled_y = (y - offset_y) * scale_y
     return [scaled_x, scaled_y]
+
+def convert_to_original_units(scaled_coord):
+    scaled_x, scaled_y = scaled_coord
+    x = scaled_x/scale_x
+    y = scaled_y/scale_y
+    return [x,y]
 
 envConfig = {
     "borders": {
@@ -67,29 +73,29 @@ envConfig = {
     "penaltyAreas": [ 
         {
             #Second coordinate is subtracted because  value, i.e. 500, was measured from top-left of image, vmas wants it from bottom left
-            "topLeft": scale_coordinate([350, 620-500]),  
-            "bottomRight": scale_coordinate([426, 620-400]),
+            "topLeft": scale_coordinate([107, original_height-152]),  
+            "bottomRight": scale_coordinate([130, original_height-122]),
             "type": "box"
         },
         {
-            "topLeft": scale_coordinate([485, 620-340]),
-            "bottomRight": scale_coordinate([525, 620-242]),
+            "topLeft": scale_coordinate([148, original_height-104]),
+            "bottomRight": scale_coordinate([160, original_height-74]),
             "type": "box"
         },
         {
-            "topLeft": scale_coordinate([350, 620-600]),
-            "bottomRight": scale_coordinate([400, 620-550]),
+            "topLeft": scale_coordinate([107, original_height-183]),
+            "bottomRight": scale_coordinate([122, original_height-168]),
             "type": "circle",
         },
         {
-            "topLeft": scale_coordinate([175, 620-200]),
-            "bottomRight": scale_coordinate([225, 620-150]),
+            "topLeft": scale_coordinate([53, original_height-61]),
+            "bottomRight": scale_coordinate([69, original_height-46]),
             "type": "circle",
         }
     ],
     "startingPoints": [
-        scale_coordinate([450, 200]),
-        scale_coordinate([475, 200])
+        scale_coordinate([137, 61]),
+        scale_coordinate([145, 61])
     ]
 }
 
@@ -165,7 +171,6 @@ class Scenario(BaseScenario):
         for x in torch.arange(self.grid_resolution/2, world_width, self.grid_resolution):
             for y in torch.arange(self.grid_resolution/2, world_height, self.grid_resolution):
                 point = [x.item(), y.item()]
-                print(point)
                 for reward_area in self.env_config["rewardAreas"]:
                     if is_point_in_polygon(point, reward_area): # TODO: Check that point not in penalty areas
                         print("Is in reward area\n")
@@ -179,7 +184,7 @@ class Scenario(BaseScenario):
                         world.add_landmark(goal)
                         scaled_point = torch.Tensor(point, device=device) * 2 - world_dims
                         self.waypoints.append(Waypoint(scaled_point, goal, reward_radius=self.reward_radius))
-                        print(f"Waypoint {len(self.waypoints)-1} created at {point}")
+                        print(f"Waypoint {len(self.waypoints)-1} created at {convert_to_original_units(point)}")
                         break
 
         # Generate waypoints at start locations
