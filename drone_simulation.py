@@ -183,7 +183,7 @@ class Scenario(BaseScenario):
                         # if agent in point
                         world.add_landmark(goal)
                         scaled_point = torch.Tensor(point, device=device) * 2 - world_dims
-                        self.waypoints.append(Waypoint(scaled_point, goal, reward_radius=self.reward_radius))
+                        self.waypoints.append(Waypoint(scaled_point, torch.Tensor(convert_to_original_units(scaled_point)),goal, reward_radius=self.reward_radius))
                         print(f"Waypoint {len(self.waypoints)-1} created at {convert_to_original_units(point)}")
                         break
 
@@ -198,7 +198,7 @@ class Scenario(BaseScenario):
             )
             # if agent in point
             world.add_landmark(goal)
-            self.waypoints.append(Waypoint(point, goal, reward_radius=self.reward_radius))
+            self.waypoints.append(Waypoint(point, torch.Tensor(convert_to_original_units(point)), goal, reward_radius=self.reward_radius))
 
         self.waypoint_visits = torch.zeros([self.n_agents, len(self.waypoints)], device=device)  # Track waypoints visited by each drone
         
@@ -309,6 +309,8 @@ class Scenario(BaseScenario):
         # Find the distance traveled since the last step
         distance = 0.0
         if prev_pos is not None and current_pos is not None:
+            print(prev_pos)
+            print(current_pos)
             distance = torch.linalg.vector_norm(current_pos - prev_pos)
 
         self.total_distance[agent_index] += distance
