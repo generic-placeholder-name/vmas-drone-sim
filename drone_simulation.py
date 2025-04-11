@@ -213,7 +213,7 @@ class Scenario(BaseScenario):
             length = bottom_right[0] - top_left[0]
             width = bottom_right[1] - top_left[1]
             center = [(top_left[0] + bottom_right[0]) / 2, (top_left[1] + bottom_right[1]) / 2]
-            obstacle_shape=Box(length=length*2, width=width*2)
+            obstacle_shape=Box(length=length, width=width)
             if penalty_area["type"]=="circle":
                 radius = length/2
                 obstacle_shape=Sphere(radius)
