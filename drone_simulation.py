@@ -37,8 +37,8 @@ def scale_coordinate(coord):
 
 def convert_to_original_units(scaled_coord):
     scaled_x, scaled_y = scaled_coord
-    x = scaled_x/scale_x
-    y = scaled_y/scale_y
+    x = scaled_x/scale_x + offset_x
+    y = scaled_y/scale_y + offset_y
     return [x,y]
 
 envConfig = {
