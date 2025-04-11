@@ -36,7 +36,7 @@ def waypoint3(landmark3):
 
 @pytest.fixture
 def waypoint4(landmark4):
-    return Waypoint(Tensor([6.0, 1.0]), landmark4)
+    return Waypoint(Tensor([5.0, 1.0]), landmark4)
 
 # Visual representation of the waypoints:
 # 
@@ -90,7 +90,7 @@ def test_edge_weight(edge_w1_w2):
 def test_edge_length(edge_w1_w2, edge_w1_w3, edge_w1_w4):
     assert edge_w1_w2.length == 2.23606797749979
     assert edge_w1_w3.length == 2.5
-    assert edge_w1_w4.length == 5.0
+    assert edge_w1_w4.length == 4.0
 
 #endregion
 
@@ -100,18 +100,47 @@ def edge_w2_w3(waypoint2, waypoint3):
     return Edge(waypoint2, waypoint3)
 
 @pytest.fixture
+def edge_w2_w4(waypoint2, waypoint4):
+    return Edge(waypoint2, waypoint4)
+
+@pytest.fixture
+def edge_w3_w4(waypoint3, waypoint4):
+    return Edge(waypoint3, waypoint4)
+
+@pytest.fixture
 def elbow1(edge_w1_w2, edge_w2_w3):
     return Elbow(edge_w1_w2, edge_w2_w3)
+
+@pytest.fixture
+def elbow2(edge_w2_w3, edge_w3_w4):
+    return Elbow(edge_w2_w3, edge_w3_w4)
+
+@pytest.fixture
+def elbow3(edge_w3_w4, edge_w1_w4):
+    return Elbow(edge_w3_w4, edge_w1_w4)
 
 @pytest.fixture
 def elbow1_reverse(edge_w1_w2, edge_w2_w3):
     return Elbow(edge_w2_w3, edge_w1_w2)
 
-def test_elbow_angle(elbow1, edge_w1_w2, edge_w2_w3, edge_w1_w3):
-    assert elbow1.angle() == torch.arccos((edge_w1_w2.length**2 + edge_w2_w3.length**2 - edge_w1_w3.length**2) / (2 * edge_w1_w2.length * edge_w2_w3.length))
+@pytest.fixture
+def elbow2_reverse(edge_w3_w4, edge_w2_w3):
+    return Elbow(edge_w3_w4, edge_w2_w3)
 
-def test_reversed_elbows_are_equal(elbow1, elbow1_reverse):
-    assert abs(elbow1.angle()) == abs(elbow1_reverse.angle())
+@pytest.fixture
+def elbow3_reverse(edge_w1_w4, edge_w3_w4):
+    return Elbow(edge_w1_w4, edge_w3_w4)
+
+def test_elbow_rotation(elbow1, elbow2, elbow3, edge_w1_w2, edge_w2_w3, edge_w1_w3, edge_w3_w4, edge_w2_w4, edge_w1_w4):
+    # Use law of cosine to check angle
+    assert torch.isclose(elbow1.rotation(), (180/torch.pi) * (torch.pi - torch.arccos((edge_w1_w2.length**2 + edge_w2_w3.length**2 - edge_w1_w3.length**2) / (2 * edge_w1_w2.length * edge_w2_w3.length))))
+    assert torch.isclose(elbow2.rotation(), torch.rad2deg(torch.pi - torch.arccos((edge_w2_w3.length**2 + edge_w3_w4.length**2 - edge_w2_w4.length**2) / (2 * edge_w2_w3.length * edge_w3_w4.length))))
+    assert torch.isclose(elbow3.rotation(), torch.rad2deg(torch.pi - torch.arccos((edge_w3_w4.length**2 + edge_w1_w4.length**2 - edge_w1_w3.length**2) / (2 * edge_w3_w4.length * edge_w1_w4.length))))
+    
+def test_reversed_elbows_are_equal(elbow1, elbow1_reverse, elbow2, elbow2_reverse, elbow3, elbow3_reverse):
+    assert elbow1.rotation() == elbow1_reverse.rotation()
+    assert elbow2.rotation() == elbow2_reverse.rotation()
+    assert elbow3.rotation() == elbow3_reverse.rotation()
 
 @pytest.fixture
 def edge_w2_w1(waypoint2, waypoint1):
@@ -141,10 +170,10 @@ def test_graph_generate_edges(graph_with_generated_edges):
     assert str(graph_with_generated_edges) == ("Graph:" +
                                                "\nEdge(A(tensor([1., 1.])), B(tensor([2., 3.]))) (weight: 1.0)" +
                                                "\nEdge(A(tensor([1., 1.])), C(tensor([3.0000, 2.5000]))) (weight: 1.0)" +
-                                               "\nEdge(A(tensor([1., 1.])), D(tensor([6., 1.]))) (weight: 1.0)" +
+                                               "\nEdge(A(tensor([1., 1.])), D(tensor([5., 1.]))) (weight: 1.0)" +
                                                "\nEdge(B(tensor([2., 3.])), C(tensor([3.0000, 2.5000]))) (weight: 1.0)" +
-                                               "\nEdge(B(tensor([2., 3.])), D(tensor([6., 1.]))) (weight: 1.0)" +
-                                               "\nEdge(C(tensor([3.0000, 2.5000])), D(tensor([6., 1.]))) (weight: 1.0)\n")
+                                               "\nEdge(B(tensor([2., 3.])), D(tensor([5., 1.]))) (weight: 1.0)" +
+                                               "\nEdge(C(tensor([3.0000, 2.5000])), D(tensor([5., 1.]))) (weight: 1.0)\n")
     
 def test_graph_get_neighbors_untraversed(graph_with_generated_edges, waypoint1, waypoint2, waypoint3, waypoint4):
     node_neighbors, edge_neighbors = graph_with_generated_edges.get_neighbors(waypoint3)
@@ -191,27 +220,36 @@ def test_graph_reset_traversed(graph_with_generated_edges, waypoint1, waypoint2,
     assert not waypoint2.traversed
     assert not waypoint3.traversed
     assert not waypoint4.traversed
-    
-def test_remove_invalid_edges():
-    penalty_areas = [{"topLeft": [2.0, 4.0], "bottomRight": [4.0, 2.0]}]
 
-    wp1 = Waypoint(torch.tensor([1.0, 1.0]), Landmark("A", shape=Sphere(radius=0.1)))
-    wp2 = Waypoint(torch.tensor([3.0, 3.0]), Landmark("B", shape=Sphere(radius=0.1)))  # Inside penalty
-    wp3 = Waypoint(torch.tensor([5.0, 1.0]), Landmark("C", shape=Sphere(radius=0.1)))
+def test_get_edges_from_waypoint_tour(graph_with_generated_edges,
+                                      waypoint1,
+                                      waypoint2,
+                                      waypoint3,
+                                      waypoint4,
+                                      edge_w1_w2,
+                                      edge_w2_w3,
+                                      edge_w3_w4,
+                                      ):
+    waypoint_tour = [waypoint1, waypoint2, waypoint3, waypoint4]
+    edge_tour = graph_with_generated_edges.get_edges_from_waypoint_tour(waypoint_tour)
+    assert len(waypoint_tour) == len(edge_tour) + 1
+    assert edge_tour[0] == edge_w1_w2, f"expected: {edge_w1_w2}, actual: {edge_tour[0]}"
+    assert edge_tour[1] == edge_w2_w3, f"expected: {edge_w2_w3}, actual: {edge_tour[1]}"
+    assert edge_tour[2] == edge_w3_w4, f"expected: {edge_w3_w4}, actual: {edge_tour[2]}"
 
-    g = Graph([wp1, wp2, wp3])
-    g.generate_edges()
+def test_get_rotation(graph_with_generated_edges, edge_w1_w2, edge_w2_w3, edge_w3_w4, edge_w1_w4, edge_w1_w3, edge_w2_w4):
+    # Verify that the correct rotations are generated
+    assert graph_with_generated_edges.get_rotation(None, edge_w1_w2) == 0
+    assert torch.isclose(graph_with_generated_edges.get_rotation(edge_w1_w2, edge_w2_w3), torch.rad2deg(torch.pi - torch.arccos((edge_w1_w2.length**2 + edge_w2_w3.length**2 - edge_w1_w3.length**2) / (2 * edge_w1_w2.length * edge_w2_w3.length))))
+    assert torch.isclose(graph_with_generated_edges.get_rotation(edge_w2_w3, edge_w3_w4), torch.rad2deg(torch.pi - torch.arccos((edge_w2_w3.length**2 + edge_w3_w4.length**2 - edge_w2_w4.length**2) / (2 * edge_w2_w3.length * edge_w3_w4.length))))
+    assert torch.isclose(graph_with_generated_edges.get_rotation(edge_w3_w4, edge_w1_w4), (180 / torch.pi) * (torch.pi - torch.arccos((edge_w3_w4.length**2 + edge_w1_w4.length**2 - edge_w1_w3.length**2) / (2 * edge_w3_w4.length * edge_w1_w4.length))))
+    # Check that when edges are flipped, rotation is the same
+    assert graph_with_generated_edges.get_rotation(edge_w1_w2, edge_w2_w3) == graph_with_generated_edges.get_rotation(edge_w2_w3, edge_w1_w2)
+    assert graph_with_generated_edges.get_rotation(edge_w2_w3, edge_w3_w4) == graph_with_generated_edges.get_rotation(edge_w3_w4, edge_w2_w3)
+    assert graph_with_generated_edges.get_rotation(edge_w3_w4, edge_w1_w4) == graph_with_generated_edges.get_rotation(edge_w1_w4, edge_w3_w4)
 
-    assert len(g.edges) == 3 # There should be three edges to begin with
-
-    bad_edges = [e for e in g.edges if not g.edge_valid(e, penalty_areas)]
-    g.remove_edges(bad_edges)
-
-    # Edges wp1-wp2, wp3-wp2 should be invalid
-    for e in g.edges:
-        assert not ((e.node1 == wp1 and e.node2 == wp2) or (e.node1 == wp2 and e.node2 == wp1))
-        assert not ((e.node1 == wp3 and e.node2 == wp2) or (e.node1 == wp2 and e.node2 == wp3))
-
-    assert len(g.edges) == 1 # There should be one edge to end with
-
+def test_get_path_costs(graph_with_generated_edges, edge_w1_w2, edge_w2_w3, edge_w3_w4):
+    total_distance = edge_w1_w2.length + edge_w2_w3.length + edge_w3_w4.length
+    total_rotation = graph_with_generated_edges.get_rotation(None, edge_w1_w2) + graph_with_generated_edges.get_rotation(edge_w1_w2, edge_w2_w3) + graph_with_generated_edges.get_rotation(edge_w2_w3, edge_w3_w4)
+    assert graph_with_generated_edges.get_path_costs(edges=[edge_w1_w2, edge_w2_w3, edge_w3_w4]) == (total_distance, total_rotation)
 #endregion
