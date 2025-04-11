@@ -252,4 +252,27 @@ def test_get_path_costs(graph_with_generated_edges, edge_w1_w2, edge_w2_w3, edge
     total_distance = edge_w1_w2.length + edge_w2_w3.length + edge_w3_w4.length
     total_rotation = graph_with_generated_edges.get_rotation(None, edge_w1_w2) + graph_with_generated_edges.get_rotation(edge_w1_w2, edge_w2_w3) + graph_with_generated_edges.get_rotation(edge_w2_w3, edge_w3_w4)
     assert graph_with_generated_edges.get_path_costs(edges=[edge_w1_w2, edge_w2_w3, edge_w3_w4]) == (total_distance, total_rotation)
+
+def test_remove_invalid_edges():
+    penalty_areas = [{"topLeft": [2.0, 4.0], "bottomRight": [4.0, 2.0]}]
+
+    wp1 = Waypoint(torch.tensor([1.0, 1.0]), Landmark("A", shape=Sphere(radius=0.1)))
+    wp2 = Waypoint(torch.tensor([3.0, 3.0]), Landmark("B", shape=Sphere(radius=0.1)))  # Inside penalty
+    wp3 = Waypoint(torch.tensor([5.0, 1.0]), Landmark("C", shape=Sphere(radius=0.1)))
+
+    g = Graph([wp1, wp2, wp3])
+    g.generate_edges()
+
+    assert len(g.edges) == 3 # There should be three edges to begin with
+
+    bad_edges = [e for e in g.edges if not g.edge_valid(e, penalty_areas)]
+    g.remove_edges(bad_edges)
+
+    # Edges wp1-wp2, wp3-wp2 should be invalid
+    for e in g.edges:
+        assert not ((e.node1 == wp1 and e.node2 == wp2) or (e.node1 == wp2 and e.node2 == wp1))
+        assert not ((e.node1 == wp3 and e.node2 == wp2) or (e.node1 == wp2 and e.node2 == wp3))
+
+    assert len(g.edges) == 1 # There should be one edge to end with
+
 #endregion
