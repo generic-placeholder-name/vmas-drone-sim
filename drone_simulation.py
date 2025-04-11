@@ -18,7 +18,7 @@ if typing.TYPE_CHECKING:
 # Original frame coordinates
 # original_top_left = [181, 7]
 # original_bottom_right = [486, 253]
-# Changed to feet x feet of farm, measured from google maps
+# Changed to meters x meters of farm, measured from google maps
 original_top_left = [0, 0]
 original_bottom_right = [245, 190]
 
