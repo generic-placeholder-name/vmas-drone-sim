@@ -215,11 +215,12 @@ class Scenario(BaseScenario):
             center = [(top_left[0] + bottom_right[0]) / 2, (top_left[1] + bottom_right[1]) / 2]
             obstacle_shape=Box(length=length, width=width)
             if penalty_area["type"]=="circle":
-                radius = length/2
+                radius = length/4 # The original divides by 2 (I assume this is erroneous, but I will divide it by 4 to match)
                 obstacle_shape=Sphere(radius)
             # else:
             #     obstacle_shape=Box(length=length*2, width=width*2), # Need to multiply by two due to nature of vmas coordinate system
 
+            print(f"Obstacle width: {width}, length: {length}, center: {center}")
 
             obstacle = Landmark(
                 name=f"obstacle_{i}",
