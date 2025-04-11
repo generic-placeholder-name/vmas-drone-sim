@@ -9,41 +9,52 @@ _scenario = Scenario()
 _print_log = False
 
 class ACO:
-    def __init__(self, graph: Graph, num_ants=20, max_iterations=100, algorithm="AS", evaporation_rate=0.001, Q=1, max_pheromone=10, min_pheromone=0, min_rotation=0.1) -> None:
+    def __init__(self, graph: Graph, start: Waypoint, num_ants=20, max_iterations=100, algorithm="AS", evaporation_rate=0.001, Q=1, min_pheromone=1.0, max_pheromone=5.0, lambda_=0.1164, gamma=0.0173, alpha=1, beta=1) -> None:
         """
         Args:
-            scenario (Scenario): The scenario that the ACO algorithm will be run on
+            graph (Graph): The graph containing all of the waypoints that should be traversed
+            start (Waypoint): The node that the ants start and end at
             num_ants (int): The number of ants that will be used in the algorithm
             max_iterations (int): The maximum number of iterations that the algorithm will run
             algorithm (str): The type of ACO algorithm to use. Options: AS (Ant System), MMAS (Max-Min Ant System)
             evaporation_rate (float): The rate at which pheromones evaporate
             Q (int): The pheromone base deposit, used for AS algorithm
-            max_pheromone (int): The max amount of pheromone that an edge can have, used for MMAS algorithm
-            min_pheromone (int): The min amount of pheromone that an edge can have, used for MMAS algorithm
-            min_rotation (float): The minimum rotation that an ant can turn when traversing a path when determining the rotation cost. Limits favorability of an edge and prevents division by zero.
+            min_pheromone (float): The min amount of pheromone that an edge can have, used for MMAS algorithm
+            max_pheromone (float): The max amount of pheromone that an edge can have, used for MMAS algorithm
+            lambda_ (float): The cost of traveling in a straight line given in kJ/m
+            gamma (float): The cost of rotating given in kJ/degree
+            alpha (float): The importance of the pheromone in the favorability calculation
+            beta (float): The importance of the heuristic measure in the favorability calculation
         """
         self.graph = graph
+        self.start = start
         self.num_ants = num_ants
         self.max_iterations = max_iterations
         self.ants = []
         self.algorithm = algorithm
         # Constants
         self.evaporation_rate = evaporation_rate
-        self.max_pheromone = max_pheromone
         self.min_pheromone = min_pheromone
+        self.max_pheromone = max_pheromone
         self.Q = Q
-        self.min_rotation = min_rotation
+        self.lambda_ = lambda_
+        self.gamma = gamma
+        self.alpha = alpha
+        self.beta = beta
 
         self.best_ant_current = None # Ant with best tour in iteration
         self.best_tour_nodes = [] # Best tour so far, specified by nodes (in all iterations)
         self.best_tour_edges = [] # Best tour so far, specified by edges (in all iterations)
         self.best_tour_distance = None
         self.best_tour_rotation = None
-        
+
+        assert self.start in self.graph.waypoints, f"Start node must be in the graph. Start node: {self.start}. Graph waypoints: {self.graph.waypoints}"
+        self.initialize_pheromones()
+
     def get_optimum_tour(self) -> List[Waypoint]:
+        """Return the best tour found by the ACO algorithm"""
         if _print_log:
             print(f"Running {self.algorithm} ACO with {self.num_ants} ants for {self.max_iterations} iterations")
-
         self.hatch_ants()
         for i in range(self.max_iterations):
             if _print_log:
@@ -53,6 +64,11 @@ class ACO:
             self.update_pheromones()
 
         return self.best_tour_nodes
+    
+    def initialize_pheromones(self):
+        """Initialize the pheromones on the edges of the graph"""
+        for edge in self.graph.edges:
+            edge.weight = self.max_pheromone
 
     def update_best_tour(self):
         """Update the best tours across all iterations, and also the best ant in the latest iteration"""
@@ -67,7 +83,7 @@ class ACO:
             # Check if ant is top performing in this iteration
             assert ant.total_distance > 0, f"Expected ant's total distance to be greater than zero. Actual: {ant.total_distance}."
             assert ant.total_rotation > 0, f"Expected ant's total rotation to be greater than zero. Actual: {ant.total_rotation}."
-            performance = heuristic(ant.total_distance, ant.total_rotation)
+            performance = heuristic(ant.total_distance, ant.total_rotation, self.lambda_, self.gamma)
             if performance > best_performance:
                 top_ant = ant
                 best_performance = performance
@@ -85,8 +101,8 @@ class ACO:
             return
         best_tour_distance, best_tour_rotation = self.graph.get_path_costs(self.best_tour_edges)
         assert best_tour_distance > 0, f"best tour distance must be greater than zero. Actual: {best_tour_distance}"
-        assert best_tour_rotation > 0, f"best tour rotation must be greater than zero. Actual: {best_tour_rotation}. Num edges: {len(self.best_tour_edges)}"
-        if heuristic(top_ant.total_distance, top_ant.total_rotation) > heuristic(best_tour_distance, best_tour_rotation):
+        assert best_tour_rotation >= 0, f"best tour rotation must be zero or greater. Actual: {best_tour_rotation}. Num edges: {len(self.best_tour_edges)}"
+        if heuristic(top_ant.total_distance, top_ant.total_rotation, self.lambda_, self.gamma) > heuristic(best_tour_distance, best_tour_rotation, self.lambda_, self.gamma):
             self.set_best_tour(top_ant.node_solution, top_ant.edge_solution, top_ant.total_distance, top_ant.total_rotation)
 
     def set_best_tour(self, tour_nodes, tour_edges, distance, rotation):
@@ -94,7 +110,6 @@ class ACO:
         self.best_tour_nodes = tour_nodes
         self.best_tour_edges = tour_edges
         self.best_tour_distance = distance
-        assert rotation >= self.min_rotation, f"rotation cannot be below the minimum rotation to limit favorability of an edge. Rotation provided: {rotation}"
         self.best_tour_rotation = rotation
 
     def construct_ant_solution(self):
@@ -109,13 +124,18 @@ class ACO:
             is_stuck = False
             while not (self.graph.fully_traversed() or is_stuck):
                 is_stuck = not ant.move_next()
+            # There are no more waypoints that the ant can visit (either all are traversed or there are no valid edges)
+            self.start.traversed = False # Give the ant the option to return to the start node
+            ant.move_next() # Move to the start node
 
     def hatch_ants(self):
+        """Instantiate the ants"""
         assert len(self.ants) == 0
         for _ in range(self.num_ants):
-            self.ants.append(Ant(self.graph, self.graph.waypoints[-2], self.graph.waypoints[-1], self.min_rotation)) # TODO: ADD WAYPOINT RIGHT NEXT TO THEIR CHARGING STATION TO BE THERE START
+            self.ants.append(Ant(self.graph, self.start, self.lambda_, self.gamma, self.alpha, self.beta))
 
     def update_pheromones(self):
+        """Update the pheromones on the edges of the graph based on the algorithm selected"""
         self.evaporate()
         if self.algorithm == "AS":
             self.deposit_pheromones_as()
@@ -135,7 +155,7 @@ class ACO:
             for edge in ant.edge_solution:
                 assert ant.total_distance > 0, f"Ant's total distance must be greater than zero. Actual: {ant.total_distance}"
                 assert ant.total_rotation > 0, f"Ant's total rotation must be greater than zero. Actual: {ant.total_rotation}"
-                edge.add_weight(self.Q * heuristic(ant.total_distance, ant.total_rotation)) # Q * (1/L) * (1/theta)
+                edge.add_weight(self.Q * heuristic(ant.total_distance, ant.total_rotation, self.lambda_, self.gamma)) # Q * (1/L) * (1/theta)
 
     def deposit_pheromones_mmas(self, all_time=False):
         """The best ant deposits pheromones on traversed edges, following Max-Min Ant System"""
@@ -152,32 +172,35 @@ class ACO:
         assert edge_tour != [], "A best tour has not been declared"
         assert len(edge_tour) + 1 == len(node_tour), "Incorrect number of edges in best tour."
         distance, rotation = self.graph.get_cost_from_edges_tour(edge_tour)
-        rotation = max(float(rotation), self.min_rotation) # Limit the favorability of an edge
         for edge in edge_tour:
-            added_pheromone = heuristic(distance, rotation) # (1/L_best) * (1/theta_best)
-            edge.weight = bound(edge.weight + added_pheromone, self.min_pheromone, self.max_pheromone) #TODO: MAKE SURE GETS HERE
+            added_pheromone = heuristic(distance, rotation, self.lambda_, self.gamma) # 1/(lambda * L_best + gamma * theta_best)
+            edge.weight = bound(edge.weight + added_pheromone, self.min_pheromone, self.max_pheromone)
 
 
 class Ant:
-    def __init__(self, graph, start_node, end_node=None, min_rotation=0.1) -> None:
+    def __init__(self, graph, start_node, lambda_, gamma, alpha, beta) -> None:
         """
         Args:
             graph (Graph): The graph that the ant is traversing
             start_node (Waypoint): The node that the ant starts at
-            end_node (Waypoint): The node that the ant will end at (not implemented yet)
-            min_rotation = Minimum radians an ant can turn when traversing a path when determining cost of rotation. Required to limit favorability and avoid division by zero.
+            lambda_ (float): The cost of traveling in a straight line given in kJ/m
+            gamma (float): The cost of rotating given in kJ/degree
+            alpha (float): The importance of the pheromone in the favorability calculation
+            beta (float): The importance of the heuristic measure in the favorability calculation
         """
         self.graph = graph
         self.start_node = start_node
-        self.end_node = end_node
-        self.min_rotation = min_rotation
+        self.lambda_ = lambda_
+        self.gamma = gamma
+        self.alpha = alpha
+        self.beta = beta
 
         self.current_node = self.start_node
         self.current_node.traversed = True
         self.node_solution = [self.start_node]
         self.edge_solution = []
         self.total_distance = 0
-        self.total_rotation = 0 # in radians
+        self.total_rotation = 0 # in degrees
 
     def reset(self):
         self.current_node = self.start_node
@@ -260,54 +283,76 @@ class Ant:
         return edge_favorabilities, edge_costs
 
     def calculate_favorability(self, edge):
-        """Calculate the favorability of the path based on its weight and heuristic measures"""
-        return edge.weight * heuristic(edge.length, self.get_rotation(edge))
+        """Calculate the favorability of the path based on its heuristic measure and pheromone"""
+        return  heuristic(edge.length, self.get_rotation(edge), self.lambda_, self.gamma)**self.alpha * edge.weight**self.beta
     
     def get_rotation(self, edge):
         """Get the positive angle at which the drone must rotate to get to the edge. Never trully zero."""
         previous_edge = self.edge_solution[-1] if len(self.edge_solution) > 0 else None
-        return max(abs(self.graph.get_rotation(previous_edge, edge)), self.min_rotation)
-
-def heuristic(distance, rotation):
-    """Returns (1/distance) * (1/rotation), assuming some degree of rotation to prevent division by zero"""
+        return abs(self.graph.get_rotation(previous_edge, edge))
+    
+def cost(distance, rotation, lambda_=0.1164, gamma=0.0173):
+    """
+    Cost function for the ACO algorithm. This function is used to calculate the cost of a path based on its distance and rotation.
+    Args:
+        distance (float): The distance of the path
+        rotation (float): The rotation of the path
+        lambda_ (float): The cost of traveling in a straight given in kJ/m
+        gamma (float): The cost of rotating given in kJ/degree
+    Returns:
+        float: The cost of the path
+    """
     assert distance > 0, f"Distance must be greater than 0. Actual: {distance}"
-    assert rotation > 0, f"Rotation must be greater than zero. Actual: {rotation}"
-    distance_heuristic = 1/distance
-    rotation_heuristic = 1/rotation
-    return distance_heuristic * rotation_heuristic
+    assert rotation >= 0, f"Rotation must be zero or greater. Actual: {rotation}"
+    return lambda_ * distance + gamma * rotation
+
+def heuristic(distance, rotation, lambda_=0.1164, gamma=0.0173):
+    """Returns favorability of a tour, or 1/(lambda * distance + gamma * rotation)"""
+    assert distance > 0, f"Distance must be greater than 0. Actual: {distance}"
+    assert rotation >= 0, f"Rotation must be zero or greater. Actual: {rotation}"
+    return 1 / cost(distance, rotation, lambda_, gamma)
 
 def bound(value, min_bound, max_bound):
+    """Returns the value bounded by the min and max bounds"""
     assert min_bound < max_bound, "minimum bound must be less than maximum bound"
     return max(min(max_bound, value), min_bound)
+
+def solve_eecpp_problem(waypoints: List[Waypoint], start: Waypoint, prohibited_areas, num_ants=20, max_iterations=100, algorithm="AS", evaporation_rate=0.001, Q=1, min_pheromone=1, max_pheromone=5, lambda_=0.1164, gamma=0.0173, alpha=1, beta=1):
+    """Solve the Energy Efficient Coverage Path Planning problem using the ACO algorithm."""
+    graph = Graph(waypoints) # waypoints to the left
+    graph.generate_edges()
+    bad_edges = [edge for edge in graph.edges if not graph.edge_valid(edge, prohibited_areas)] # edges are bad if they do not pass edge_valid
+    graph.remove_edges(bad_edges) # remove edges that could cause a collision
+    aco = ACO(graph, start, num_ants, max_iterations, algorithm, evaporation_rate, Q, min_pheromone, max_pheromone, lambda_, gamma, alpha, beta)
+    best_tour = aco.get_optimum_tour()
+    return best_tour, aco
 
 if __name__ == "__main__":
     _scenario.make_world(batch_dim=1, device='cpu') # "cpu" underlined but doesn't cause error
     _scenario.reset_world_at()
-    graph = Graph(_scenario.waypoints)
-    graph.generate_edges()
 
     penalty_areas = envConfig["penaltyAreas"] # get penalty areas from envConfig in test.py
-    bad_edges = [edge for edge in graph.edges if not graph.edge_valid(edge, penalty_areas)] # edges are bad if they do not pass edge_valid
-    graph.remove_edges(bad_edges) # remove bad edges
+    tour1, aco1 = solve_eecpp_problem([_scenario.waypoints[-1]] + _scenario.waypoints[:15], _scenario.waypoints[-1], penalty_areas, algorithm="MMAS")
+    tour2, aco2 = solve_eecpp_problem([_scenario.waypoints[-2]] + _scenario.waypoints[15:-2], _scenario.waypoints[-2], penalty_areas, algorithm="MMAS")
 
-    aco = ACO(graph, 20, 25, "MMAS") # Can switch to AS
-    path = aco.get_optimum_tour()
-    if aco.best_tour_edges is not None:
-        for edge in aco.best_tour_edges:
-            print(edge)
-    for waypoint in path:
+    print("\nfirst tour:\n")
+    for waypoint in tour1:
+        print(waypoint)
+    
+    print("\nsecond tour:\n")
+    for waypoint in tour2:
         print(waypoint)
 
-    print("\nall time best solution:\n")
-    print(f"Total distance: {aco.best_tour_distance}")
-    print(f"Total radians rotated: {aco.best_tour_rotation}")
-    print(f"Performance: {heuristic(aco.best_tour_distance, aco.best_tour_rotation)}")
-    print(f"Number of waypoints visited: {len(aco.best_tour_nodes)} out of {len(aco.graph.waypoints)}")
+    print("\nfirst tour costs\n")
+    print(f"Total distance: {aco1.best_tour_distance}")
+    print(f"Total radians rotated: {aco1.best_tour_rotation}")
+    print(f"Performance: {heuristic(aco1.best_tour_distance, aco1.best_tour_rotation)}")
+    print(f"Number of waypoints visited: {len(aco1.best_tour_nodes[1:])} out of {len(aco1.graph.waypoints)}")
+    print(f"Returned to start node: {aco1.best_tour_nodes[0] == aco1.best_tour_nodes[-1]}")
 
-    print("\ncurrent best ant:\n")
-    if aco.best_ant_current is not None:
-        print(f"Total distance: {aco.best_ant_current.total_distance}")
-        print(f"Total radians rotated: {aco.best_ant_current.total_rotation}")
-        print(f"Performance: {heuristic(aco.best_ant_current.total_distance, aco.best_ant_current.total_rotation)}")
-        print(f"Number of waypoints visited: {len(aco.best_ant_current.node_solution)} out of {len(aco.graph.waypoints)}")
-    
+    print("\nsecond tour costs\n")
+    print(f"Total distance: {aco2.best_tour_distance}")
+    print(f"Total radians rotated: {aco2.best_tour_rotation}")
+    print(f"Performance: {heuristic(aco2.best_tour_distance, aco2.best_tour_rotation)}")
+    print(f"Number of waypoints visited: {len(aco2.best_tour_nodes[1:])} out of {len(aco2.graph.waypoints)}")
+    print(f"Returned to start node: {aco1.best_tour_nodes[0] == aco1.best_tour_nodes[-1]}")
