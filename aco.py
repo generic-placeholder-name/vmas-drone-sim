@@ -349,6 +349,8 @@ if __name__ == "__main__":
     print(f"Performance: {heuristic(aco1.best_tour_distance, aco1.best_tour_rotation)}")
     print(f"Number of waypoints visited: {len(aco1.best_tour_nodes[1:])} out of {len(aco1.graph.waypoints)}")
     print(f"Returned to start node: {aco1.best_tour_nodes[0] == aco1.best_tour_nodes[-1]}")
+    for edge in aco1.graph.edges:
+        print(edge)
 
     print("\nsecond tour costs\n")
     print(f"Total distance: {aco2.best_tour_distance}")

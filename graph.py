@@ -189,9 +189,8 @@ class Graph():
 
 class Waypoint():
     """A Waypoint represents a point in 2D space with an associated vmas landmark."""
-    def __init__(self, point: torch.Tensor, point_meters:torch.Tensor, landmark: Landmark, reward_radius=0.01, dtype=torch.float32):
+    def __init__(self, point: torch.Tensor, landmark: Landmark, reward_radius=0.01, dtype=torch.float32):
         self._point = point
-        self._point_meters = point_meters
         self._landmark = landmark
         self._reward_radius = reward_radius
         self._traversed = False
@@ -291,7 +290,7 @@ class Edge():
 
     def estimate_length(self):
         """Estimate the length of the edge based on the distance between the two waypoints."""
-        return torch.linalg.vector_norm(self._node2._point_meters - self._node1._point_meters)
+        return torch.linalg.vector_norm(self._node2._point - self._node1._point)
     
     def __str__(self):
         return f"Edge({self._node1}, {self._node2}) (weight: {self.weight})"
