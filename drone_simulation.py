@@ -33,13 +33,17 @@ def scale_coordinate(coord):
     x, y = coord
     scaled_x = (x - offset_x) * scale_x
     scaled_y = (y - offset_y) * scale_y
+    scaled_x = scaled_x * 2 - (original_width * scale_x)
+    scaled_y = scaled_y * 2 - (original_height * scale_y)
     return [scaled_x, scaled_y]
 
 def convert_to_original_units(scaled_coord):
     scaled_x, scaled_y = scaled_coord
-    x = scaled_x/scale_x + offset_x
-    y = scaled_y/scale_y + offset_y
-    return [x,y]
+    scaled_x = (scaled_x + (original_width * scale_x)) / 2
+    scaled_y = (scaled_y + (original_height * scale_y)) / 2
+    x = scaled_x / scale_x + offset_x
+    y = scaled_y / scale_y + offset_y
+    return [x, y]
 
 envConfig = {
     "borders": {
@@ -160,7 +164,7 @@ class Scenario(BaseScenario):
                 dynamics=DiffDrive(world, integration="rk4"),
             )
             world.add_agent(agent)
-            self.agent_start_pos.append(torch.Tensor(self.env_config["startingPoints"][i], device=device) * 2 - world_dims)
+            self.agent_start_pos.append(torch.Tensor(self.env_config["startingPoints"][i], device=device))
         
         self.total_rotation = torch.zeros(len(self.world.agents), device=device)  # Track total rotation for each agent
         self.prev_rotations = [agent.state.rot for agent in self.world.agents]  # Track previous rotation for each agent
@@ -168,8 +172,8 @@ class Scenario(BaseScenario):
               \nWorld width: {world_width}\n")
         
         # Generate goal (waypoints) points in reward areas
-        for x in torch.arange(self.grid_resolution/2, world_width, self.grid_resolution):
-            for y in torch.arange(self.grid_resolution/2, world_height, self.grid_resolution):
+        for x in torch.arange(-world_width + self.grid_resolution, world_width, self.grid_resolution*2):
+            for y in torch.arange(-world_height + self.grid_resolution/2, world_height, self.grid_resolution*2):
                 point = [x.item(), y.item()]
                 for reward_area in self.env_config["rewardAreas"]:
                     if is_point_in_polygon(point, reward_area): # TODO: Check that point not in penalty areas
@@ -182,14 +186,13 @@ class Scenario(BaseScenario):
                         )
                         # if agent in point
                         world.add_landmark(goal)
-                        scaled_point = torch.Tensor(point, device=device) * 2 - world_dims
-                        self.waypoints.append(Waypoint(scaled_point, goal, reward_radius=self.reward_radius))
-                        print(f"Waypoint {len(self.waypoints)-1} created at {convert_to_original_units(point)}")
+                        self.waypoints.append(Waypoint(torch.Tensor(point, device=device), goal, reward_radius=self.reward_radius))
+                        print(f"Waypoint {len(self.waypoints)-1} created at {point} = {convert_to_original_units(point)}")
                         break
 
         # Generate waypoints at start locations
         for (x, y) in self.agent_start_pos:
-            point = torch.Tensor([x.item(), y.item()], device=device)
+            point = [x.item(), y.item()]
             goal = Landmark(
                 name=f"goal_{len(self.waypoints)}",
                 collide=False,
@@ -198,7 +201,8 @@ class Scenario(BaseScenario):
             )
             # if agent in point
             world.add_landmark(goal)
-            self.waypoints.append(Waypoint(point, goal, reward_radius=self.reward_radius))
+            self.waypoints.append(Waypoint(torch.Tensor(point, device=device), goal, reward_radius=self.reward_radius))
+            print(f"Waypoint {len(self.waypoints)-1} created at {point} = {convert_to_original_units(point)}")
 
         self.waypoint_visits = torch.zeros([self.n_agents, len(self.waypoints)], device=device)  # Track waypoints visited by each drone
         
@@ -227,7 +231,7 @@ class Scenario(BaseScenario):
             )
             
             world.add_landmark(obstacle)
-            self.obs_pos.append(torch.Tensor(center, device=device) * 2 - world_dims)
+            self.obs_pos.append(torch.Tensor(center, device=device))
 
         self.prev_positions = [agent.state.pos for agent in self.world.agents]
         self.total_distance = torch.zeros(len(self.world.agents), device=device)
