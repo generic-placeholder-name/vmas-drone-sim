@@ -290,7 +290,7 @@ class Edge():
 
     def estimate_length(self):
         """Estimate the length of the edge based on the distance between the two waypoints."""
-        return torch.linalg.vector_norm(self._node2.point - self._node1.point)
+        return torch.linalg.vector_norm(self._node2._point - self._node1._point)
     
     def __str__(self):
         return f"Edge({self._node1}, {self._node2}) (weight: {self.weight})"
