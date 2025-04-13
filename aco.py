@@ -6,12 +6,13 @@ from torch import Tensor
 from drone_simulation import envConfig
 from draw import draw_paths
 import optuna
+import csv
 
 _scenario = Scenario()
 _print_log = False
 
 class ACO:
-    def __init__(self, graph: Graph, start: Waypoint, num_ants=20, max_iterations=100, algorithm="AS", evaporation_rate=0.001, Q=1, min_pheromone=1.0, max_pheromone=5.0, lambda_=0.1164, gamma=0.0173, alpha=1, beta=1) -> None:
+    def __init__(self, graph: Graph, start: Waypoint, num_ants=414, max_iterations=138, algorithm="MMAS", evaporation_rate=0.01336, Q=1, min_pheromone=1.0, max_pheromone=2.027, lambda_=0.1164, gamma=0.0173, alpha=3.985, beta=2.391) -> None:
         """
         Args:
             graph (Graph): The graph containing all of the waypoints that should be traversed
@@ -320,7 +321,7 @@ def bound(value, min_bound, max_bound):
     assert min_bound < max_bound, "minimum bound must be less than maximum bound"
     return max(min(max_bound, value), min_bound)
 
-def solve_eecpp_problem(waypoints: List[Waypoint], start: Waypoint, prohibited_areas, num_ants=100, max_iterations=100, algorithm="AS", evaporation_rate=0.001, Q=1, min_pheromone=1.0, max_pheromone=5.0, lambda_=0.1164, gamma=0.0173, alpha=1, beta=1):
+def solve_eecpp_problem(waypoints: List[Waypoint], start: Waypoint, prohibited_areas, num_ants=414, max_iterations=138, algorithm="MMAS", evaporation_rate=0.01336, Q=1, min_pheromone=1.0, max_pheromone=2.027, lambda_=0.1164, gamma=0.0173, alpha=3.985, beta=2.391):
     """Solve the Energy Efficient Coverage Path Planning problem using the ACO algorithm."""
     graph = Graph(waypoints) # waypoints to the left
     graph.generate_edges()
@@ -360,7 +361,7 @@ def objective(trial):
     # Parameter search spacce
     n = trial.suggest_int("n", 10, 500) # number of ants
     iter = trial.suggest_int("iter", 10, 200) # number of iterations
-    phi = trial.suggest_float("phi", 0.001, 1) # evaporation rate
+    rho = trial.suggest_float("rho", 0.001, 1) # evaporation rate
     alpha = trial.suggest_float("alpha", 0.1, 5) # heuristic importance
     beta = trial.suggest_float("beta", 0.1, 5) # pheromone importance
     Q = 1
@@ -374,20 +375,58 @@ def objective(trial):
     _scenario.reset_world_at()
 
     penalty_areas = envConfig["penaltyAreas"] # get penalty areas from envConfig in drone_simulaion.py
-    tour1, aco1 = solve_eecpp_problem([_scenario.waypoints[-1]] + _scenario.waypoints[:15], _scenario.waypoints[-1], penalty_areas, num_ants=n, max_iterations=iter, algorithm=algorithm, evaporation_rate=phi, Q=Q, min_pheromone=tau_min, max_pheromone=tau_max, lambda_=lambda_, gamma=gamma, alpha=alpha, beta=beta)
-    tour2, aco2 = solve_eecpp_problem([_scenario.waypoints[-2]] + _scenario.waypoints[15:-2], _scenario.waypoints[-2], penalty_areas, num_ants=n, max_iterations=iter, algorithm=algorithm, evaporation_rate=phi, Q=Q, min_pheromone=tau_min, max_pheromone=tau_max, lambda_=lambda_, gamma=gamma, alpha=alpha, beta=beta)
+    tour1, aco1 = solve_eecpp_problem([_scenario.waypoints[-1]] + _scenario.waypoints[:15], _scenario.waypoints[-1], penalty_areas, num_ants=n, max_iterations=iter, algorithm=algorithm, evaporation_rate=rho, Q=Q, min_pheromone=tau_min, max_pheromone=tau_max, lambda_=lambda_, gamma=gamma, alpha=alpha, beta=beta)
+    tour2, aco2 = solve_eecpp_problem([_scenario.waypoints[-2]] + _scenario.waypoints[15:-2], _scenario.waypoints[-2], penalty_areas, num_ants=n, max_iterations=iter, algorithm=algorithm, evaporation_rate=rho, Q=Q, min_pheromone=tau_min, max_pheromone=tau_max, lambda_=lambda_, gamma=gamma, alpha=alpha, beta=beta)
     if aco1.best_tour_nodes[0] != aco1.best_tour_nodes[-1] or aco2.best_tour_nodes[0] != aco2.best_tour_nodes[-1]:
         # At least one drone does not return to the charging station
         return 0
     
     # Return performance of the tours. Higher number is better as it means less energy cost.
     return heuristic(aco1.best_tour_distance, aco1.best_tour_rotation, lambda_, gamma) + heuristic(aco2.best_tour_distance, aco2.best_tour_rotation, lambda_, gamma)
+
+def test_ant_system_vs_mmas(num_trials=10):
+    """Generate file of performance of AS vs MMAS"""
+    data = [["Algorithm", "Distance", "Rotation", "Energy Cost", "Num Waypoints", "Returned to Start"]]
+    
+    _scenario.make_world(batch_dim=1, device='cpu') # "cpu" underlined but doesn't cause error
+    _scenario.reset_world_at()
+
+    penalty_areas = envConfig["penaltyAreas"] # get penalty areas from envConfig in test.py
+    for i in range(num_trials):
+        _, aco = solve_eecpp_problem(_scenario.waypoints[:-1], _scenario.waypoints[-2], penalty_areas, algorithm="AS")
+        assert aco.best_tour_distance is not None and aco.best_tour_rotation is not None
+        assert aco.best_tour_nodes is not None
+
+        data.append(["AS",
+                     aco.best_tour_distance,
+                     aco.best_tour_rotation,
+                     cost(aco.best_tour_distance, aco.best_tour_rotation),
+                     str(len(aco.best_tour_nodes)),
+                     aco.best_tour_nodes[0] == aco.best_tour_nodes[-1]])
+        
+    for i in range(num_trials):
+        _, aco = solve_eecpp_problem(_scenario.waypoints[:-1], _scenario.waypoints[-2], penalty_areas, algorithm="MMAS")
+        assert aco.best_tour_distance is not None and aco.best_tour_rotation is not None
+        assert aco.best_tour_nodes is not None
+
+        data.append(["MMAS",
+                     aco.best_tour_distance,
+                     aco.best_tour_rotation,
+                     cost(aco.best_tour_distance, aco.best_tour_rotation),
+                     str(len(aco.best_tour_nodes)),
+                     aco.best_tour_nodes[0] == aco.best_tour_nodes[-1]])
+
+    filename = f'as_mmas_performance_{num_trials}_trials.csv'
+    with open(filename, 'w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerows(data)
+    print(f'Generated aco performance comparison file: {filename}')
     
 def optimize_aco():
     """Find best performing hyperparameters for the ACO algorithm on the farm"""
     # Create and run the study
     study = optuna.create_study(direction="maximize")
-    study.optimize(objective, n_trials=2) # change too 100 later
+    study.optimize(objective, n_trials=40) # change too 100 later
 
     # Output best parameters
     print("Best parameters:", study.best_params)
@@ -398,14 +437,18 @@ def optimize_aco():
     df.to_csv("optimization_results.csv", index=False)
 
 if __name__ == "__main__":
-    optimize_aco()
-    # Uncomment the following lines to test the ACO algorithm with a specific set of parameters
+    test_ant_system_vs_mmas(2)
+
+    # Uncomment to run hyperparameter tuning
+    # optimize_aco()
+
+    # Uncomment to find tours for each drone around the farm
     # _scenario.make_world(batch_dim=1, device='cpu') # "cpu" underlined but doesn't cause error
     # _scenario.reset_world_at()
 
     # penalty_areas = envConfig["penaltyAreas"] # get penalty areas from envConfig in test.py
-    # tour1, aco1 = solve_eecpp_problem([_scenario.waypoints[-1]] + _scenario.waypoints[:15], _scenario.waypoints[-1], penalty_areas, algorithm="MMAS")
-    # tour2, aco2 = solve_eecpp_problem([_scenario.waypoints[-2]] + _scenario.waypoints[15:-2], _scenario.waypoints[-2], penalty_areas, algorithm="MMAS")
+    # tour1, aco1 = solve_eecpp_problem(_scenario.waypoints[:-1], _scenario.waypoints[-2], penalty_areas, algorithm="AS")#tour1, aco1 = solve_eecpp_problem([_scenario.waypoints[-2]] + _scenario.waypoints[:15], _scenario.waypoints[-2], penalty_areas, algorithm="MMAS")
+    # tour2 = []#tour2, aco2 = solve_eecpp_problem([_scenario.waypoints[-1]] + _scenario.waypoints[15:-2], _scenario.waypoints[-1], penalty_areas, algorithm="MMAS")
 
     # print("\nfirst tour:\n")
     # for waypoint in tour1:
@@ -422,11 +465,11 @@ if __name__ == "__main__":
     # print(f"Number of waypoints visited: {len(aco1.best_tour_nodes[1:])} out of {len(aco1.graph.waypoints)}")
     # print(f"Returned to start node: {aco1.best_tour_nodes[0] == aco1.best_tour_nodes[-1]}")
 
-    # print("\nsecond tour costs\n")
-    # print(f"Total distance: {aco2.best_tour_distance}")
-    # print(f"Total degrees rotated: {aco2.best_tour_rotation}")
-    # print(f"Performance: {heuristic(aco2.best_tour_distance, aco2.best_tour_rotation)}")
-    # print(f"Number of waypoints visited: {len(aco2.best_tour_nodes[1:])} out of {len(aco2.graph.waypoints)}")
-    # print(f"Returned to start node: {aco2.best_tour_nodes[0] == aco2.best_tour_nodes[-1]}")
+    # # print("\nsecond tour costs\n")
+    # # print(f"Total distance: {aco2.best_tour_distance}")
+    # # print(f"Total degrees rotated: {aco2.best_tour_rotation}")
+    # # print(f"Performance: {heuristic(aco2.best_tour_distance, aco2.best_tour_rotation)}")
+    # # print(f"Number of waypoints visited: {len(aco2.best_tour_nodes[1:])} out of {len(aco2.graph.waypoints)}")
+    # # print(f"Returned to start node: {aco2.best_tour_nodes[0] == aco2.best_tour_nodes[-1]}")
     
     # draw_aco_solution(tour1, tour2)
