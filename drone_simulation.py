@@ -44,6 +44,10 @@ def convert_to_original_units(scaled_coord):
 
 
 envConfig = {
+    "origBorders": { # for retrieval in ACO file
+        "topLeft": original_top_left,
+        "bottomRight": original_bottom_right
+    },
     "borders": {
         "topLeft": scale_coordinate(original_top_left),
         "bottomRight": scale_coordinate(original_bottom_right)
