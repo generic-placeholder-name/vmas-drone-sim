@@ -4,6 +4,7 @@ from graph import *
 from typing import List
 from torch import Tensor
 from drone_simulation import envConfig
+from draw import draw_paths
 
 _scenario = Scenario()
 _print_log = False
@@ -355,4 +356,24 @@ if __name__ == "__main__":
     print(f"Total degrees rotated: {aco2.best_tour_rotation}")
     print(f"Performance: {heuristic(aco2.best_tour_distance, aco2.best_tour_rotation)}")
     print(f"Number of waypoints visited: {len(aco2.best_tour_nodes[1:])} out of {len(aco2.graph.waypoints)}")
-    print(f"Returned to start node: {aco1.best_tour_nodes[0] == aco1.best_tour_nodes[-1]}")
+    print(f"Returned to start node: {aco2.best_tour_nodes[0] == aco2.best_tour_nodes[-1]}")
+
+    print("\nDrawing paths...\n")
+    # Draw the graph with the best tours
+    all_wps = tour1 + tour2  
+    paths = [[Edge(best_tour[i], best_tour[i+1]) for i in range(len(best_tour)-1)] for best_tour in (tour1, tour2)]
+    print('*' * 20)
+    for edge in paths[0]:
+        print(edge.node1.point, edge.node2.point)
+    print('*' * 20)
+    for edge in paths[1]:
+            print(edge.node1.point, edge.node2.point)
+    print('*' * 20)
+    dims = envConfig["origBorders"]["topLeft"] + envConfig["origBorders"]["bottomRight"]
+    draw_paths(
+        waypoints=all_wps,
+        paths=paths,
+        obstacles=envConfig["penaltyAreas"],
+        dimensions=dims,
+        file_path="coverage_path.png",
+    )
