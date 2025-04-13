@@ -96,8 +96,8 @@ envConfig = {
         }
     ],
     "startingPoints": [
-        scale_coordinate([137, 61]),
-        scale_coordinate([145, 61])
+        scale_coordinate([105, 150]),
+        scale_coordinate([125, 150])
     ]
 }
 

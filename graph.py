@@ -265,7 +265,7 @@ class Edge():
     
     @weight.setter
     def weight(self, value):
-        assert value > 0, "Weight must be positive"
+        assert value > 0, f"Weight must be positive. Got {value}."
         self._weight = torch.tensor(value, dtype=torch.float32)
 
     def add_weight(self, value):
@@ -335,7 +335,7 @@ class Elbow():
     
     @weight.setter
     def weight(self, value):
-        assert value > 0, "Weight must be positive"
+        assert value > 0, f"Weight must be positive. Got {value}."
         self._weight = torch.tensor(value, dtype=torch.float32)
 
     def add_weight(self, value):
