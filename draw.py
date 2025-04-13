@@ -9,7 +9,7 @@ import torch
 def draw_paths(
     waypoints: list[Waypoint],
     paths: list[list[Edge]],
-    obstacles: None | list[Landmark],
+    obstacles: None | list[dict],
     dimensions: tuple[float, float, float, float],
     file_path: str,
 ):
@@ -17,9 +17,7 @@ def draw_paths(
     Draws specified paths on a blank image and saves it to the specified file path.
     :param waypoints: List of Waypoint objects.
     :param paths: List of paths, each path is a list of Edge objects.
-    :param obstacles: List of Landmark objects representing obstacles.
-                      - Box instances have x, y, width, height.
-                      - Sphere instances have x, y, radius.
+    :param obstacles: List of objects representing obstacles.
     :param dimensions: A tuple (x_min, y_min, x_max, y_max) defining the bounding box.
     :param file_path: File path to save the image.
     """
@@ -29,35 +27,39 @@ def draw_paths(
     x_min, y_min, x_max, y_max = dimensions
     free_width = x_max - x_min
     free_height = y_max - y_min
+
     free_area = patches.Rectangle(
         (x_min, y_min), free_width, free_height,
         facecolor='green', alpha=0.2, edgecolor='none'
     )
     ax.add_patch(free_area)
 
-    # Draw obstacles by type
+    # Draw penalty areas
     if obstacles:
-        for obs in obstacles:
-            if isinstance(obs, Box): 
-                # draw rectangle centered at (x, y)
-                # TODO: AFAIK, Landmark objects do not have (x, y) attributes. Explore potential solutions.
-                ll = (obs.x - obs.width/2, obs.y - obs.height/2)
+        for pa in obstacles:
+            tlx, tly = pa["topLeft"]
+            brx, bry = pa["bottomRight"]
+            w = brx - tlx
+            h = bry - tly
+            cx = tlx + w/2
+            cy = tly + h/2
+
+            if pa["type"] == "box":
                 rect = patches.Rectangle(
-                    ll, obs.width, obs.height,
-                    facecolor='gray', alpha=0.5, edgecolor='gray'
+                    (tlx, tly), w, h,
+                    facecolor='red', alpha=0.3, edgecolor='red'
                 )
                 ax.add_patch(rect)
 
-            elif isinstance(obs, Sphere):
-                circle = patches.Circle(
-                    (obs.x, obs.y), obs.radius,
-                    facecolor='gray', alpha=0.5, edgecolor='gray'
+            elif pa["type"] == "circle":
+                r = min(w, h)/2
+                circ = patches.Circle(
+                    (cx, cy), r,
+                    facecolor='red', alpha=0.3, edgecolor='red'
                 )
-                ax.add_patch(circle)
-
+                ax.add_patch(circ)
             else:
-                # fallback: draw as a point
-                ax.scatter(obs.x, obs.y, c='gray', s=30, alpha=0.5)
+                ax.scatter(cx, cy, c='red', s=30, alpha=0.5)
 
     # Plot waypoints
     if waypoints:
@@ -88,9 +90,8 @@ def draw_paths(
 
     def path_turns(p):
         tot = 0
-        for i in range(1, len(p)):
-            nxt = (i + 1) % len(p)
-            elbow = Elbow(p[i], p[nxt])
+        for i in range(len(p) - 1): # Note: Since not all tours are closed, I'm not wrapping around for now
+            elbow = Elbow(p[i], p[i + 1]) # If all tours are closed, we should wrap around to the first edge
             tot += elbow.angle()
         return tot
 
@@ -107,7 +108,7 @@ def draw_paths(
                 verticalalignment='top',
                 bbox=dict(facecolor='white', alpha=0.8))
 
-    # 6) Final styling
+    # Final styling
     ax.legend(loc='lower center', bbox_to_anchor=(0.5, -0.1), ncol=len(paths) or 1)
     ax.set_xlim(x_min, x_max)
     ax.set_ylim(y_min, y_max)
