@@ -137,6 +137,16 @@ class Graph():
         for waypoint in self._waypoints:
             waypoint.traversed = False
 
+    def rest_weights(self, value=1.0):
+        """Reset all edge weights to a given value."""
+        for edge in self._edges:
+            edge.weight = value
+
+    def reset(self, weight_value=1.0):
+        """Reset all waypoints and edges in the graph."""
+        self.reset_traversed()
+        self.rest_weights(weight_value)
+
     def get_path_costs(self, edges=None, waypoints=None):
         """Returns total distance and total rotations of a path"""
         if edges is not None and waypoints is not None:
