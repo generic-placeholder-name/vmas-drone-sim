@@ -252,4 +252,20 @@ def test_get_path_costs(graph_with_generated_edges, edge_w1_w2, edge_w2_w3, edge
     total_distance = edge_w1_w2.length + edge_w2_w3.length + edge_w3_w4.length
     total_rotation = graph_with_generated_edges.get_rotation(None, edge_w1_w2) + graph_with_generated_edges.get_rotation(edge_w1_w2, edge_w2_w3) + graph_with_generated_edges.get_rotation(edge_w2_w3, edge_w3_w4)
     assert graph_with_generated_edges.get_path_costs(edges=[edge_w1_w2, edge_w2_w3, edge_w3_w4]) == (total_distance, total_rotation)
+
+def test_reset(graph_with_generated_edges):
+    for waypoint in graph_with_generated_edges.waypoints:
+        waypoint.traversed = True
+    for edge in graph_with_generated_edges.edges:
+        edge.weight = 5
+
+    assert graph_with_generated_edges.waypoints[0].traversed
+    assert graph_with_generated_edges.edges[0].weight == 5
+
+    graph_with_generated_edges.reset()
+
+    for waypoint in graph_with_generated_edges.waypoints:
+        assert not waypoint.traversed
+    for edge in graph_with_generated_edges.edges:
+        assert edge.weight == 1.0
 #endregion
