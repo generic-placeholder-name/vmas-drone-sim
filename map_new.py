@@ -1,13 +1,22 @@
 import re
 import numpy as np
 import pydeck as pdk
+import os
 
 # Bounding box on map (lat, lon) — Chris' farm
+# map_bounds = np.array([
+#     [44.853465, -92.816663],
+#     [44.855128, -92.816765],
+#     [44.855102, -92.819639],
+#     [44.853587, -92.819852]
+# ])
+
+# Updated values attempting to get more distance from tree line
 map_bounds = np.array([
-    [44.853465, -92.816663],
-    [44.855128, -92.816765],
-    [44.855102, -92.819639],
-    [44.853587, -92.819852]
+    [44.85366044095515, -92.81970832066362],
+    [44.85507868903245, -92.8197044208057],
+    [44.854965341057, -92.8170447177042],
+    [44.85368532280144, -92.8170798164277]
 ])
 
 # Normalize both tours together
@@ -49,6 +58,8 @@ def export_qgc_waypoints(geo_coords, filename, altitude=20.0):
 if __name__ == "__main__":
     # Read tours from file
     first_tour, second_tour = parse_tours_from_file("vmas-drone-sim/tours/waypoints/twodrones_mmas_1.txt")
+    second_tour[:,1] = second_tour.max(axis=0)[1]-second_tour[:,1]
+    first_tour[:,1] = first_tour.max(axis=0)[1]-first_tour[:,1]
 
     # Normalize together for consistency
     all_pixels = np.vstack([first_tour, second_tour])
