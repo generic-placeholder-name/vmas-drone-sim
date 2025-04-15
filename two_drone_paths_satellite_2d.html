@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    <title>pydeck</title>
+        <script src="https://api.tiles.mapbox.com/mapbox-gl-js/v1.13.0/mapbox-gl.js"></script>
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap-theme.min.css" />
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.6.3/css/font-awesome.min.css" />
+    <script src='https://cdn.jsdelivr.net/npm/@deck.gl/jupyter-widget@~9.0.*/dist/index.js'></script>
+    <style>
+    body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+#deck-container {
+  width: 100vw;
+  height: 100vh;
+}
+
+#deck-container canvas {
+  z-index: 1;
+  background: none;
+}
+    </style>
+  </head>
+  <body>
+    <div id="deck-container">
+    </div>
+  </body>
+  <script>
+    const container = document.getElementById('deck-container');
+    const jsonInput = {
+  "initialViewState": {
+    "bearing": 0,
+    "latitude": 44.85423615988836,
+    "longitude": -92.81822647464116,
+    "pitch": 0,
+    "zoom": 18
+  },
+  "layers": [
+    {
+      "@@type": "PathLayer",
+      "data": [
+        {
+          "path": [
+            [
+              -92.81840855789474,
+              44.853694756578946
+            ],
+            [
+              -92.8185764,
+              44.85388075
+            ],
+            [
+              -92.8185764,
+              44.854296500000004
+            ],
+            [
+              -92.8192142,
+              44.854296500000004
+            ],
+            [
+              -92.8192142,
+              44.85471225
+            ],
+            [
+              -92.8185764,
+              44.85471225
+            ],
+            [
+              -92.8185764,
+              44.855128
+            ],
+            [
+              -92.8192142,
+              44.855128
+            ],
+            [
+              -92.819852,
+              44.855128
+            ],
+            [
+              -92.819852,
+              44.85471225
+            ],
+            [
+              -92.819852,
+              44.854296500000004
+            ],
+            [
+              -92.819852,
+              44.85388075
+            ],
+            [
+              -92.819852,
+              44.853465
+            ],
+            [
+              -92.8192142,
+              44.853465
+            ],
+            [
+              -92.8185764,
+              44.853465
+            ],
+            [
+              -92.81840855789474,
+              44.853694756578946
+            ]
+          ]
+        }
+      ],
+      "getColor": [
+        255,
+        0,
+        0
+      ],
+      "getWidth": 1,
+      "id": "a4669f92-b94c-4e6f-99a3-58e288db3faf",
+      "widthScale": 1
+    },
+    {
+      "@@type": "ScatterplotLayer",
+      "data": [
+        {
+          "lat": 44.853694756578946,
+          "lon": -92.81840855789474,
+          "order": 0
+        },
+        {
+          "lat": 44.85388075,
+          "lon": -92.8185764,
+          "order": 1
+        },
+        {
+          "lat": 44.854296500000004,
+          "lon": -92.8185764,
+          "order": 2
+        },
+        {
+          "lat": 44.854296500000004,
+          "lon": -92.8192142,
+          "order": 3
+        },
+        {
+          "lat": 44.85471225,
+          "lon": -92.8192142,
+          "order": 4
+        },
+        {
+          "lat": 44.85471225,
+          "lon": -92.8185764,
+          "order": 5
+        },
+        {
+          "lat": 44.855128,
+          "lon": -92.8185764,
+          "order": 6
+        },
+        {
+          "lat": 44.855128,
+          "lon": -92.8192142,
+          "order": 7
+        },
+        {
+          "lat": 44.855128,
+          "lon": -92.819852,
+          "order": 8
+        },
+        {
+          "lat": 44.85471225,
+          "lon": -92.819852,
+          "order": 9
+        },
+        {
+          "lat": 44.854296500000004,
+          "lon": -92.819852,
+          "order": 10
+        },
+        {
+          "lat": 44.85388075,
+          "lon": -92.819852,
+          "order": 11
+        },
+        {
+          "lat": 44.853465,
+          "lon": -92.819852,
+          "order": 12
+        },
+        {
+          "lat": 44.853465,
+          "lon": -92.8192142,
+          "order": 13
+        },
+        {
+          "lat": 44.853465,
+          "lon": -92.8185764,
+          "order": 14
+        },
+        {
+          "lat": 44.853694756578946,
+          "lon": -92.81840855789474,
+          "order": 15
+        }
+      ],
+      "getFillColor": "@@=[255, 0, 0, 160]",
+      "getPosition": "@@=[lon, lat]",
+      "getRadius": 3,
+      "id": "1f21f53b-34dd-49b1-8e0a-1273bbdc123e"
+    },
+    {
+      "@@type": "PathLayer",
+      "data": [
+        {
+          "path": [
+            [
+              -92.81807287368422,
+              44.853694756578946
+            ],
+            [
+              -92.8179386,
+              44.853465
+            ],
+            [
+              -92.8173008,
+              44.853465
+            ],
+            [
+              -92.816663,
+              44.853465
+            ],
+            [
+              -92.816663,
+              44.85388075
+            ],
+            [
+              -92.816663,
+              44.854296500000004
+            ],
+            [
+              -92.816663,
+              44.85471225
+            ],
+            [
+              -92.816663,
+              44.855128
+            ],
+            [
+              -92.8173008,
+              44.855128
+            ],
+            [
+              -92.8179386,
+              44.855128
+            ],
+            [
+              -92.8179386,
+              44.85471225
+            ],
+            [
+              -92.8179386,
+              44.854296500000004
+            ],
+            [
+              -92.8173008,
+              44.85471225
+            ],
+            [
+              -92.8173008,
+              44.854296500000004
+            ],
+            [
+              -92.8173008,
+              44.85388075
+            ],
+            [
+              -92.8179386,
+              44.85388075
+            ],
+            [
+              -92.81807287368422,
+              44.853694756578946
+            ]
+          ]
+        }
+      ],
+      "getColor": [
+        0,
+        0,
+        255
+      ],
+      "getWidth": 1,
+      "id": "cb696035-d190-43ca-9f27-d480003e1eaa",
+      "widthScale": 1
+    },
+    {
+      "@@type": "ScatterplotLayer",
+      "data": [
+        {
+          "lat": 44.853694756578946,
+          "lon": -92.81807287368422,
+          "order": 0
+        },
+        {
+          "lat": 44.853465,
+          "lon": -92.8179386,
+          "order": 1
+        },
+        {
+          "lat": 44.853465,
+          "lon": -92.8173008,
+          "order": 2
+        },
+        {
+          "lat": 44.853465,
+          "lon": -92.816663,
+          "order": 3
+        },
+        {
+          "lat": 44.85388075,
+          "lon": -92.816663,
+          "order": 4
+        },
+        {
+          "lat": 44.854296500000004,
+          "lon": -92.816663,
+          "order": 5
+        },
+        {
+          "lat": 44.85471225,
+          "lon": -92.816663,
+          "order": 6
+        },
+        {
+          "lat": 44.855128,
+          "lon": -92.816663,
+          "order": 7
+        },
+        {
+          "lat": 44.855128,
+          "lon": -92.8173008,
+          "order": 8
+        },
+        {
+          "lat": 44.855128,
+          "lon": -92.8179386,
+          "order": 9
+        },
+        {
+          "lat": 44.85471225,
+          "lon": -92.8179386,
+          "order": 10
+        },
+        {
+          "lat": 44.854296500000004,
+          "lon": -92.8179386,
+          "order": 11
+        },
+        {
+          "lat": 44.85471225,
+          "lon": -92.8173008,
+          "order": 12
+        },
+        {
+          "lat": 44.854296500000004,
+          "lon": -92.8173008,
+          "order": 13
+        },
+        {
+          "lat": 44.85388075,
+          "lon": -92.8173008,
+          "order": 14
+        },
+        {
+          "lat": 44.85388075,
+          "lon": -92.8179386,
+          "order": 15
+        },
+        {
+          "lat": 44.853694756578946,
+          "lon": -92.81807287368422,
+          "order": 16
+        }
+      ],
+      "getFillColor": "@@=[0, 0, 255, 160]",
+      "getPosition": "@@=[lon, lat]",
+      "getRadius": 3,
+      "id": "bd644cbf-e994-4c2a-af9e-2f6f5ea6403f"
+    }
+  ],
+  "mapProvider": "carto",
+  "mapStyle": "https://api.maptiler.com/maps/hybrid/style.json?key=im85a70Qszr71cqMjv5l",
+  "views": [
+    {
+      "@@type": "MapView",
+      "controller": true
+    }
+  ]
+};
+    const tooltip = {'text': 'Waypoint {order}'};
+    const customLibraries = null;
+    const configuration = null;
+
+    const deckInstance = createDeck({
+                  container,
+      jsonInput,
+      tooltip,
+      customLibraries,
+      configuration
+    });
+
+  </script>
+</html>
