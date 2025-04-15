@@ -380,7 +380,7 @@ def objective(trial):
     # Return performance of the tours. Higher number is better as it means less energy cost.
     return heuristic(aco1.best_tour_distance, aco1.best_tour_rotation, lambda_, gamma) + heuristic(aco2.best_tour_distance, aco2.best_tour_rotation, lambda_, gamma)
 
-def compare_aco_algorithms(num_trials=10):
+def compare_aco_algorithms_2drones(num_trials=10):
     """Generate file of performance of AS vs MMAS"""
     data = [["Algorithm", "Distance", "Rotation", "Energy Cost", "Num Waypoints", "Returned to Start"]]
     
@@ -415,7 +415,47 @@ def compare_aco_algorithms(num_trials=10):
         assert aco2_as.best_tour_nodes is not None
         data.append(process_aco_results(aco1_as, aco2_as))
 
-    filename = f'as_mmas_performance_{num_trials}_trials.csv'
+    filename = f'as_mmas_2drone_performance_{num_trials}_trials.csv'
+    with open(filename, 'w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerows(data)
+    print(f'Generated aco performance comparison file: {filename}')
+
+def compare_aco_algorithms_1drone(num_trials=30):
+    """Generate file of performance of AS vs MMAS"""
+    data = [["Algorithm", "Distance", "Rotation", "Energy Cost", "Num Waypoints", "Returned to Start"]]
+    
+    _scenario.make_world(batch_dim=1, device='cpu') # "cpu" underlined but doesn't cause error
+    _scenario.reset_world_at()
+    
+    penalty_areas = envConfig["penaltyAreas"] # get penalty areas from envConfig in test.py
+    graph = prepare_graph([_scenario.waypoints[-2]] + _scenario.waypoints[:-2], penalty_areas)
+    
+    for i in range(num_trials):
+        graph.reset()
+        _, aco_as = solve_eecpp_problem(graph, _scenario.waypoints[-2], algorithm="AS")
+        assert aco_as.best_tour_distance is not None and aco_as.best_tour_rotation is not None
+        assert aco_as.best_tour_nodes is not None
+        data.append([aco_as.algorithm,
+                     aco_as.best_tour_distance.item(),
+                     aco_as.best_tour_rotation.item(),
+                     cost(aco_as.best_tour_distance, aco_as.best_tour_rotation).item(),
+                     str(len(aco_as.best_tour_nodes)),
+                     aco_as.best_tour_nodes[0] == aco_as.best_tour_nodes[-1]])
+        
+    for i in range(num_trials):
+        graph.reset()
+        _, aco_as = solve_eecpp_problem(graph, _scenario.waypoints[-2], algorithm="MMAS")
+        assert aco_as.best_tour_distance is not None and aco_as.best_tour_rotation is not None
+        assert aco_as.best_tour_nodes is not None
+        data.append([aco_as.algorithm,
+                     aco_as.best_tour_distance.item(),
+                     aco_as.best_tour_rotation.item(),
+                     cost(aco_as.best_tour_distance, aco_as.best_tour_rotation).item(),
+                     str(len(aco_as.best_tour_nodes)),
+                     aco_as.best_tour_nodes[0] == aco_as.best_tour_nodes[-1]])
+
+    filename = f'as_mmas_1drone_performance_{num_trials}_trials.csv'
     with open(filename, 'w', newline='') as file:
         writer = csv.writer(file)
         writer.writerows(data)
@@ -432,9 +472,9 @@ def process_aco_results(aco1, aco2):
     aco_as_returned_to_start = aco1.best_tour_nodes[0] == aco1.best_tour_nodes[-1] and aco2.best_tour_nodes[0] == aco2.best_tour_nodes[-1]
     assert aco1.algorithm == aco2.algorithm, f"Expected both drones to use the same ACO algorithm. Actual: {aco1.algorithm} and {aco2.algorithm}"
     return [aco1.algorithm,
-            aco_distance,
-            aco_rotation,
-            aco_cost,
+            aco_distance.item(),
+            aco_rotation.item(),
+            aco_cost.item(),
             str(aco_as_number_of_waypoints),
             aco_as_returned_to_start]
 
@@ -462,7 +502,7 @@ def optimize_aco():
 
 if __name__ == "__main__":
     # Uncomment to compare AS and MMAS performance
-    compare_aco_algorithms(10)
+    compare_aco_algorithms_1drone(30)
 
     # Uncomment to run hyperparameter tuning
     #optimize_aco()
