@@ -186,15 +186,11 @@ def merge_all_lines(lines, free_area, obstacles, num_iterations=50):
 
         # Do 2-opt optimization on the merged segment. 
         # Since the tour is made up of 2-point segments, we do 2-opt on 2 points at a time.
-        # This is a simple greedy approach, not the most efficient.
+        # This is a simple greedy approach, not the most efficient.s
         assert(len(final_seg) % 2 == 0), "Final segment should have an even number of points."
         for _ in range(num_iterations):
             for i in range(0, len(final_seg), 2):
-                for j in range(i + 2, len(final_seg), 2):
-                    a = final_seg[i]
-                    b = final_seg[i + 1]
-                    c = final_seg[j]
-                    d = final_seg[j + 1]
+                for j in range(i + 2, len(final_seg), 2): 
                     original_cost = (
                         dist[final_seg[(i - 1) % len(final_seg)]][final_seg[i]] + dist[final_seg[i + 1]][final_seg[(i + 2) % len(final_seg)]] +
                         dist[final_seg[(j - 1) % len(final_seg)]][final_seg[j]] + dist[final_seg[j + 1]][final_seg[(j + 2) % len(final_seg)]]
@@ -327,12 +323,8 @@ def generate_drone_path(waypoints, base_point, survey_radius, free_area, obstacl
         print(f"Path merging failed: {e}")
         return None
 
-# Split survey area
+# === Parameters ===
 box_coords = (0, 0, 245, 190)
-split_x = 115
-left_box = (0, 0, split_x, 620)
-right_box = (split_x, 0, 800, 620)
-
 obstacles = [
     (107, 38, 130, 68),
     (148, 86, 160, 116),
@@ -342,70 +334,64 @@ obstacles = [
 obs_tolerance = 3
 survey_radius = 19
 
+# Expand obstacles by tolerance
 big_obstacles = [
     (x1 - obs_tolerance, y1 - obs_tolerance, x2 + obs_tolerance, y2 + obs_tolerance)
     for (x1, y1, x2, y2) in obstacles
 ]
 
-# Generate waypoints
-waypoints, free_area = generate_grid_waypoints(box_coords, big_obstacles, survey_radius*2)
+# Generate waypoints over the whole area
+waypoints, free_area = generate_grid_waypoints(
+    box_coords, big_obstacles, grid_res=survey_radius*2
+)
 
-# Split waypoints between drones
-left_waypoints = [p for p in waypoints if p[0] <= split_x]
-right_waypoints = [p for p in waypoints if p[0] > split_x]
-
-# Generate paths
+# Single drone base
 base1 = (105, 150)
-base2 = (125, 150)
-path1 = generate_drone_path(left_waypoints, base1, survey_radius, free_area, big_obstacles)
-path2 = generate_drone_path(right_waypoints, base2, survey_radius, free_area, big_obstacles)
 
-# Visualization
+# Build vertical segments + base connection
+segments = create_vertical_lines(waypoints, survey_radius, free_area)
+segments.append(LineString([base1, base1]))  # ensures base is in the tour
+
+# Merge into one closed tour
+path1 = merge_all_lines(segments, free_area, big_obstacles)
+
+# === Visualization ===
 fig, ax = plt.subplots(figsize=(10, 8))
 
-# Plot free area and obstacles
+# Free area
 x_free, y_free = free_area.exterior.xy
 ax.fill(x_free, y_free, alpha=0.2, fc='green', ec='none')
 
+# Original (un‑toleranced) obstacles in gray
 for obs in obstacles:
     obs_poly = shapely_box(*obs)
     x_obs, y_obs = obs_poly.exterior.xy
     ax.fill(x_obs, y_obs, alpha=0.5, fc='gray', ec='gray')
 
-# Plot waypoints
-wp_x, wp_y = zip(*waypoints) if waypoints else ([], [])
-ax.scatter(wp_x, wp_y, c='black', s=10, alpha=0.5, label='Waypoints')
+# Waypoints
+if waypoints:
+    wp_x, wp_y = zip(*waypoints)
+    ax.scatter(wp_x, wp_y, c='black', s=10, alpha=0.5, label='Waypoints')
 
-# Plot drone paths
+# Single drone path
 if path1:
     x1, y1 = path1.xy
-    ax.plot(x1, y1, 'r-', lw=2, label='Drone 1 Path')
-if path2:
-    x2, y2 = path2.xy
-    ax.plot(x2, y2, 'b-', lw=2, label='Drone 2 Path')
+    ax.plot(x1, y1, 'r-', lw=2, label='Drone Path')
 
-print(path1)
-print(path2)
+# Metrics
+length = path1.length if path1 else 0
+turns  = calculate_total_turn_angle(path1) if path1 else 0
+stats = [f"Length={length:.1f}", f"Turns={turns:.1f}°"]
+ax.text(0.05, 0.95, "\n".join(stats),
+        transform=ax.transAxes, verticalalignment='top',
+        bbox=dict(facecolor='white', alpha=0.8))
 
-# Move legend to the bottom of the graph
-ax.legend(loc='lower center', bbox_to_anchor=(0.5, -0.1), ncol=3)
-
-# Add metrics
-stats = []
-if path1:
-    stats.append(f"Drone 1: Length={path1.length:.1f}, Turns={calculate_total_turn_angle(path1):.1f}°")
-if path2:
-    stats.append(f"Drone 2: Length={path2.length:.1f}, Turns={calculate_total_turn_angle(path2):.1f}°")
-    
-if stats:
-    ax.text(0.05, 0.95, "\n".join(stats), transform=ax.transAxes,
-            verticalalignment='top', bbox=dict(facecolor='white', alpha=0.8))
-
+# Final styling
 ax.set_xlim(box_coords[0], box_coords[2])
 ax.set_ylim(box_coords[1], box_coords[3])
 ax.set_aspect('equal')
-ax.legend()
-
-plt.title("Waypoint-Based Survey Path")
-plt.savefig(f"img/two_drones_survey_path_waypoints_{survey_radius}.png")
+ax.legend(loc='lower center', bbox_to_anchor=(0.5, -0.1))
+plt.title("Single-Drone Survey Path")
+plt.tight_layout()
+plt.savefig(f"img/single_drone_survey_path_{survey_radius}.png")
 plt.close()

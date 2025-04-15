@@ -18,24 +18,36 @@ if typing.TYPE_CHECKING:
 # Original frame coordinates
 # original_top_left = [181, 7]
 # original_bottom_right = [486, 253]
-# Changed to feet x feet of farm, measured from google maps
+# Changed to meters x meters of farm, measured from google maps
 original_top_left = [0, 0]
-original_bottom_right = [800, 620]
+original_bottom_right = [245, 190]
 
 original_width = original_bottom_right[0] - original_top_left[0]
 original_height = original_bottom_right[1] - original_top_left[1]
-scale_x = 1 / min(original_width, original_height)
-scale_y = 1 / min(original_width, original_height)
-offset_x = original_top_left[0]
-offset_y = original_top_left[1]
+
+# Find the center of the original region
+center_x = (original_top_left[0] + original_bottom_right[0]) / 2
+center_y = (original_top_left[1] + original_bottom_right[1]) / 2
+
+# Scale based on shorter side to fit within [-1, 1]
+scale = 2 / min(original_width, original_height) #2 units / 190 meters
 
 def scale_coordinate(coord):
+    """converts meters to [-1, 1] coordinates"""
     x, y = coord
-    scaled_x = (x - offset_x) * scale_x
-    scaled_y = (y - offset_y) * scale_y
-    return [scaled_x, scaled_y]
+    return torch.tensor([(x - center_x) * scale, (y - center_y) * scale])
+
+def convert_to_original_units(scaled_coord):
+    """Converts [-1, 1] coordinates to meters"""
+    x, y = scaled_coord
+    return [x / scale + center_x, y / scale + center_y]
+
 
 envConfig = {
+    "origBorders": { # for retrieval in ACO file
+        "topLeft": original_top_left,
+        "bottomRight": original_bottom_right
+    },
     "borders": {
         "topLeft": scale_coordinate(original_top_left),
         "bottomRight": scale_coordinate(original_bottom_right)
@@ -67,29 +79,29 @@ envConfig = {
     "penaltyAreas": [ 
         {
             #Second coordinate is subtracted because  value, i.e. 500, was measured from top-left of image, vmas wants it from bottom left
-            "topLeft": scale_coordinate([350, 620-500]),  
-            "bottomRight": scale_coordinate([426, 620-400]),
+            "topLeft": [107, original_height-152],  
+            "bottomRight": [130, original_height-122],
             "type": "box"
         },
         {
-            "topLeft": scale_coordinate([485, 620-340]),
-            "bottomRight": scale_coordinate([525, 620-242]),
+            "topLeft": [148, original_height-104],
+            "bottomRight": [160, original_height-74],
             "type": "box"
         },
         {
-            "topLeft": scale_coordinate([350, 620-600]),
-            "bottomRight": scale_coordinate([400, 620-550]),
+            "topLeft": [107, original_height-183],
+            "bottomRight": [122, original_height-168],
             "type": "circle",
         },
         {
-            "topLeft": scale_coordinate([175, 620-200]),
-            "bottomRight": scale_coordinate([225, 620-150]),
+            "topLeft": [53, original_height-61],
+            "bottomRight": [69, original_height-46],
             "type": "circle",
         }
     ],
     "startingPoints": [
-        scale_coordinate([450, 200]),
-        scale_coordinate([475, 200])
+        scale_coordinate([105, 150]),
+        scale_coordinate([125, 150])
     ]
 }
 
@@ -135,7 +147,7 @@ class Scenario(BaseScenario):
         # Make world
         world = World(batch_dim, device, x_semidim=world_width, y_semidim=world_height)
         self._world = world
-        world_dims = torch.Tensor([world_width, world_height])
+        world_dims = torch.tensor([world_width, world_height])
         self.cumulative_reward = torch.zeros(
             self.world.batch_dim,
             device=self.world.device,
@@ -154,79 +166,66 @@ class Scenario(BaseScenario):
                 dynamics=DiffDrive(world, integration="rk4"),
             )
             world.add_agent(agent)
-            self.agent_start_pos.append(torch.Tensor(self.env_config["startingPoints"][i], device=device) * 2 - world_dims)
-            
+            self.agent_start_pos.append(torch.tensor(self.env_config["startingPoints"][i], device=device))
+        
         self.total_rotation = torch.zeros(len(self.world.agents), device=device)  # Track total rotation for each agent
         self.prev_rotations = [agent.state.rot for agent in self.world.agents]  # Track previous rotation for each agent
-      
-        for (x, y) in self.agent_start_pos:
-            point = torch.Tensor([x.item(), y.item()], device=device)
-            goal = Landmark(
-                name=f"goal {len(self.waypoints)}",
-                collide=False,
-                shape=Sphere(radius=self.reward_radius),
-                color=Color.LIGHT_GREEN,
-            )
-            # if agent in point
-            world.add_landmark(goal)
-            self.waypoints.append(Waypoint(point, goal, reward_radius=self.reward_radius))
-
-        # Generate goal (waypoints) points in reward areas
         print(f"World height: {world_height} \
               \nWorld width: {world_width}\n")
         
-        # Generate waypoints at start locations
-        for (x, y) in self.agent_start_pos:
-            point = torch.Tensor([x.item(), y.item()], device=device)
-            goal = Landmark(
-                name=f"goal {len(self.waypoints)}",
-                collide=False,
-                shape=Sphere(radius=self.reward_radius),
-                color=Color.LIGHT_GREEN,
-            )
-            # if agent in point
-            world.add_landmark(goal)
-            self.waypoints.append(Waypoint(point, goal, reward_radius=self.reward_radius))
-        
         # Generate goal (waypoints) points in reward areas
-        for x in torch.arange(self.grid_resolution/2, world_width, self.grid_resolution):
-            for y in torch.arange(self.grid_resolution/2, world_height, self.grid_resolution):
-                print(f"Reward at {x.item()} {y.item()}")
+        for x in torch.arange(-world_width + self.grid_resolution, world_width, self.grid_resolution*2):
+            for y in torch.arange(-world_height + self.grid_resolution, world_height, self.grid_resolution*2):
                 point = [x.item(), y.item()]
-                print(point)
                 for reward_area in self.env_config["rewardAreas"]:
                     if is_point_in_polygon(point, reward_area): # TODO: Check that point not in penalty areas
                         print("Is in reward area\n")
                         goal = Landmark(
-                            name=f"goal {len(self.waypoints)}",
+                            name=f"goal_{len(self.waypoints)}",
                             collide=False,
                             shape=Sphere(radius=self.reward_radius),
                             color=Color.LIGHT_GREEN,
                         )
                         # if agent in point
                         world.add_landmark(goal)
-                        scaled_point = torch.Tensor(point, device=device) * 2 - world_dims
-                        self.waypoints.append(Waypoint(scaled_point, goal, reward_radius=self.reward_radius))
+                        self.waypoints.append(Waypoint(torch.tensor(convert_to_original_units(point), device=device), goal, reward_radius=self.reward_radius))
+                        print(f"Waypoint {len(self.waypoints)-1} created at {point} = {convert_to_original_units(point)}")
                         break
+
+        # Generate waypoints at start locations
+        for (x, y) in self.agent_start_pos:
+            point = [x.item(), y.item()]
+            goal = Landmark(
+                name=f"goal_{len(self.waypoints)}",
+                collide=False,
+                shape=Sphere(radius=self.reward_radius),
+                color=Color.LIGHT_GREEN,
+            )
+            # if agent in point
+            world.add_landmark(goal)
+            self.waypoints.append(Waypoint(torch.tensor(convert_to_original_units(point), device=device), goal, reward_radius=self.reward_radius))
+            print(f"Waypoint {len(self.waypoints)-1} created at {point} = {convert_to_original_units(point)}")
+
         self.waypoint_visits = torch.zeros([self.n_agents, len(self.waypoints)], device=device)  # Track waypoints visited by each drone
         
         # Add penalty areas as landmarks
         for i, penalty_area in enumerate(self.env_config["penaltyAreas"]):
-            top_left = penalty_area["topLeft"]
-            bottom_right = penalty_area["bottomRight"]
+            top_left = scale_coordinate(penalty_area["topLeft"])
+            bottom_right = scale_coordinate(penalty_area["bottomRight"])
             length = bottom_right[0] - top_left[0]
             width = bottom_right[1] - top_left[1]
             center = [(top_left[0] + bottom_right[0]) / 2, (top_left[1] + bottom_right[1]) / 2]
-            obstacle_shape=Box(length=length*2, width=width*2)
+            obstacle_shape=Box(length=length.item(), width=width.item())
             if penalty_area["type"]=="circle":
-                radius = length/2
-                obstacle_shape=Sphere(radius)
+                radius = length/4 # The original divides by 2 (I assume this is erroneous, but I will divide it by 4 to match)
+                obstacle_shape=Sphere(radius.item())
             # else:
             #     obstacle_shape=Box(length=length*2, width=width*2), # Need to multiply by two due to nature of vmas coordinate system
 
+            print(f"Obstacle width: {width}, length: {length}, center: {center}")
 
             obstacle = Landmark(
-                name=f"obstacle {i}",
+                name=f"obstacle_{i}",
                 collide=True,  # Penalty areas are collidable
                 movable=False,
                 shape=obstacle_shape, # Need to multiply by two due to nature of vmas coordinate system
@@ -235,7 +234,7 @@ class Scenario(BaseScenario):
             )
             
             world.add_landmark(obstacle)
-            self.obs_pos.append(torch.Tensor(center, device=device) * 2 - world_dims)
+            self.obs_pos.append(torch.tensor(center, device=device))
 
         self.prev_positions = [agent.state.pos for agent in self.world.agents]
         self.total_distance = torch.zeros(len(self.world.agents), device=device)
@@ -245,7 +244,7 @@ class Scenario(BaseScenario):
     def reset_world_at(self, env_index: int | None = None):
         n_goals = len(self.waypoints)
         agents = [self.world.agents[i] for i in torch.randperm(self.n_agents).tolist()]
-        goals = [self.world.landmarks[i] for i in torch.randperm(n_goals).tolist()]
+        goals = [self.world.landmarks[i] for i in torch.range(start=0,end=n_goals-1,dtype=int).tolist()]
         order = range(len(self.world.landmarks[n_goals :]))
         obstacles = [self.world.landmarks[n_goals :][i] for i in order]
         self.waypoint_visits = torch.zeros([self.n_agents, len(self.waypoints)], device=self.world.device) # reset the counter
@@ -254,7 +253,7 @@ class Scenario(BaseScenario):
         self.prev_rotations = [agent.state.rot for agent in self.world.agents]  # Reset previous rotations
         for i, goal in enumerate(goals):
             goal.set_pos(
-                self.waypoints[i].point,
+                scale_coordinate(self.waypoints[i].point),
                 batch_index=env_index,
             )
         for i, agent in enumerate(agents):
@@ -284,9 +283,10 @@ class Scenario(BaseScenario):
                 if landmark.name.startswith("goal"):
                     # print(i, landmark.state.pos, agent.state.pos, torch.linalg.vector_norm(landmark.state.pos - agent.state.pos), self.reward_radius)
                     if self.world.is_overlapping(agent, landmark) and self.waypoint_visits[agent_index, i] == 0:
+                        waypoint_index = self.get_waypoint_index(landmark)
                         self.cumulative_reward += 1.0
-                        self.waypoint_visits[agent_index, i] += 1
-                        print(f"Agent {agent_index} reached waypoint {i}!")
+                        self.waypoint_visits[agent_index, waypoint_index] += 1
+                        print(f"Agent {agent_index} reached waypoint {waypoint_index}!")
                         print(f"Waypoint visits: {self.waypoint_visits[agent_index]}")
                         print(f"reward: {self.cumulative_reward}")
                         print(f"total distance: {self.total_distance[agent_index]}")
@@ -297,6 +297,14 @@ class Scenario(BaseScenario):
                         print(f"Collision by agent {agent_index}")
                         print(f"reward: {self.cumulative_reward}")
                         print("----------------------------")
+                        
+        #Checking drone collison, with another drone.
+        for i, agent2 in enumerate(self.world.agents):
+            if agent != agent2 and self.world.is_overlapping(agent, agent2):
+                self.cumulative_reward -= self.cumulative_reward
+                print(f"Agent {agent.name} collided with {agent2.name}!")
+                print(f"reward: {self.cumulative_reward}")
+                print("----------------------------")
         return self.cumulative_reward
 
     def observation(self, agent: Agent):

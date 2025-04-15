@@ -1,5 +1,6 @@
 import torch
 from vmas.simulator.core import Landmark
+import numpy as np
 
 class Graph():
     """A Graph represents a collection of waypoints connected by edges."""
@@ -31,6 +32,65 @@ class Graph():
                     assert node1 != node2, "repeated waypoints in self._waypoints"
                     edge = Edge(node1, node2)
                     self.add_edge(edge)
+    
+    def remove_edges(self, bad_edges : list):
+        """Remove unwanted edges from graph list"""
+        print(f"Initial edges: {len(self._edges)}")
+        good_edges = [edge for edge in self._edges if edge not in bad_edges]
+        self._edges = good_edges
+        print(f"Edges after removal: {len(self._edges)}")
+
+    def edge_valid(self, edge, penalties, margin=0.08):
+        """Ensure edge is valid, i.e. does not go through penalty area or too close to penalty area"""
+        w1 = edge.node1
+        w2 = edge.node2
+        w1_valid = self.waypoint_valid(w1, penalties)
+        w2_valid = self.waypoint_valid(w2, penalties)
+        if w1_valid and w2_valid:
+            for penalty in penalties:
+                # New top left and bottom right with padding
+                tl = torch.tensor([penalty["topLeft"][0],penalty["topLeft"][1]]) - torch.tensor([margin, margin])
+                br = torch.tensor([penalty["bottomRight"][0],penalty["bottomRight"][1]]) + torch.tensor([margin, margin])
+
+                # Rectangle corners (clockwise order)
+                corners = [tl, torch.tensor([br[0], tl[1]]), br, torch.tensor([tl[0], br[1]])]
+
+                # Check intersection between the line and each of the rectangle's sides
+                for i in range(4):
+                    if self.do_lines_intersect(w1.point, w2.point, corners[i], corners[(i + 1) % 4]):
+                        print(f"Edge {w1} to {w2} intersects with penalty area")
+                        return False
+            # No intersection, return True for valid
+            return True
+        else:
+            if not w1_valid:
+                print(f"Waypoint {w1} invalid")
+            if not w2_valid:
+                print(f"Waypoint {w2} invalid")
+            return False
+    
+    def do_lines_intersect(self, p1, p2, q1, q2):
+        # Calculate cross products to see if segments intersect
+        d1 = np.cross(np.array(p2) - np.array(p1), np.array(q1) - np.array(p1))
+        d2 = np.cross(np.array(p2) - np.array(p1), np.array(q2) - np.array(p1))
+        d3 = np.cross(np.array(q2) - np.array(q1), np.array(p1) - np.array(q1))
+        d4 = np.cross(np.array(q2) - np.array(q1), np.array(p2) - np.array(q1))
+
+        return (d1 * d2 < 0) and (d3 * d4 < 0)
+
+    def waypoint_valid(self, waypoint, penalties, margin=0.08):
+        """Ensure waypoint is valid, i.e. not in penalty area or too close to penalty area"""
+        point = waypoint.point
+        for penalty in penalties:
+            top_left_x = penalty["topLeft"][0] - margin
+            bottom_right_x = penalty["bottomRight"][0] + margin
+            top_left_y = penalty["topLeft"][1] - margin
+            bottom_right_y = penalty["bottomRight"][1] + margin
+            # Check if waypoint is within penalty area + margin/padding
+            if (top_left_x <= point[0].item() <= bottom_right_x) and (top_left_y <= point[1].item() <= bottom_right_y):
+                # It is in penalty area, is invalid so return False
+                return False
+        return True
 
     def add_waypoint(self, waypoint):
         assert isinstance(waypoint, Waypoint), "waypoint must be an instance of Waypoint"
@@ -76,7 +136,60 @@ class Graph():
         """Set all waypoints in the graph as not traversed."""
         for waypoint in self._waypoints:
             waypoint.traversed = False
-    
+
+    def rest_weights(self, value=1.0):
+        """Reset all edge weights to a given value."""
+        for edge in self._edges:
+            edge.weight = value
+
+    def reset(self, weight_value=1.0):
+        """Reset all waypoints and edges in the graph."""
+        self.reset_traversed()
+        self.rest_weights(weight_value)
+
+    def get_path_costs(self, edges=None, waypoints=None):
+        """Returns total distance and total rotations of a path"""
+        if edges is not None and waypoints is not None:
+            raise ValueError("Both edges and waypoints were provided when only one of them should be.")
+        elif edges is not None:
+            return self.get_cost_from_edges_tour(edges)
+        elif waypoints is not None:
+            return self.get_cost_from_edges_tour(self.get_edges_from_waypoint_tour(waypoints))
+        else:
+            raise ValueError("edges or (exclusive) waypoints must be provided.")
+        
+    def get_edges_from_waypoint_tour(self, waypoints):
+        """Returns the equivalent waypoint path expressed in edges"""
+        edges = []
+        previous_waypoint_index = 0
+        for i in range(1, len(waypoints)):
+            edge = self.get_edge(waypoints[previous_waypoint_index], waypoints[i])
+            assert edge is not None, f"Invalid path. No edge connects waypoints {waypoints[previous_waypoint_index]} and {waypoints[i]}"
+            edges.append(edge)
+            previous_waypoint_index = i
+        return edges
+
+    def get_cost_from_edges_tour(self, edges):
+        """Returns the total costs from traversing edges path (distance, rotation)"""
+        previous_edge = None
+        distance = 0
+        rotation = 0
+        for edge in edges:
+            distance += edge.length
+            rotation += self.get_rotation(previous_edge, edge)
+            previous_edge = edge
+        return distance, rotation
+
+    def get_rotation(self, previous_edge, edge):
+        """Return degrees rotated after traversing previous edge and current edge"""
+        assert previous_edge is None or isinstance(previous_edge, Edge), "previous_edge must be an edge"
+        assert isinstance(edge, Edge), "edge must be an edge"
+        if previous_edge is None:
+            return 0
+        else:
+            assert previous_edge != edge, f"Can't get rotation between the same edges, {previous_edge} and {edge}"
+            return Elbow(previous_edge, edge).rotation()
+
     def __str__(self) -> str:
         str = "Graph:\n"
         for edge in self._edges:
@@ -162,7 +275,7 @@ class Edge():
     
     @weight.setter
     def weight(self, value):
-        assert value > 0, "Weight must be positive"
+        assert value > 0, f"Weight must be positive. Got {value}."
         self._weight = torch.tensor(value, dtype=torch.float32)
 
     def add_weight(self, value):
@@ -187,7 +300,7 @@ class Edge():
 
     def estimate_length(self):
         """Estimate the length of the edge based on the distance between the two waypoints."""
-        return torch.linalg.vector_norm(self._node2.point - self._node1.point)
+        return torch.linalg.vector_norm(self._node2._point - self._node1._point)
     
     def __str__(self):
         return f"Edge({self._node1}, {self._node2}) (weight: {self.weight})"
@@ -207,12 +320,16 @@ class Elbow():
         self._edge = edge
         self._previous_edge = previous_edge
         self._weight = torch.tensor(weight, dtype=torch.float32)
+        self._point1 = None
+        self._point2 = None
+        self._point3 = None
 
         assert isinstance(edge, Edge), "edge must be an instance of Edge"
         assert isinstance(previous_edge, Edge), "previous_edge must be an instance of Edge"
         assert get_node_in_common(previous_edge, edge) is not None, "The edges must be connected"
         assert previous_edge != edge, "The edges must not be the same"
         assert self._weight > 0, "Weight must be positive"
+        self.set_ordered_points()
 
     @property
     def edge(self):
@@ -228,7 +345,7 @@ class Elbow():
     
     @weight.setter
     def weight(self, value):
-        assert value > 0, "Weight must be positive"
+        assert value > 0, f"Weight must be positive. Got {value}."
         self._weight = torch.tensor(value, dtype=torch.float32)
 
     def add_weight(self, value):
@@ -236,11 +353,25 @@ class Elbow():
         if self._weight < 0:
             self._weight = torch.tensor(0.0, dtype=torch.float32)
 
+    def set_ordered_points(self):
+        common_node = self.get_common_node()
+        self.point1 = self.previous_edge.node1.point if self.previous_edge.node2 == common_node else self.previous_edge.node2.point
+        self.point2 = common_node.point
+        self.point3 = self.edge.node2.point if self.edge.node1 == common_node else self.edge.node1.point
+
+    def get_common_node(self):
+        if self.previous_edge.node1 in self.edge.nodes:
+            return self.previous_edge.node1
+        elif self.previous_edge.node2 in self.edge.nodes:
+            return self.previous_edge.node2
+        else:
+            raise ValueError(f"No common node found in edges. Nodes found: {self.previous_edge.node1}, {self.previous_edge.node2}, {self.edge.node1}, {self.edge.node2}")
+        
     def angle(self):
-        """Calculate the angle (in radians) between the two edges."""
+        """Calculate the angle (in degrees) between the two edges."""
         # Get the direction vectors of the edges
-        dir1 = self._edge._node2.point - self._edge._node1.point
-        dir2 = self._previous_edge._node2.point - self._previous_edge._node1.point
+        dir1 = self.point3 - self.point2
+        dir2 = self.point1 - self.point2
         
         # Normalize the direction vectors
         dir1 = dir1 / torch.linalg.vector_norm(dir1)
@@ -248,7 +379,11 @@ class Elbow():
         
         # Calculate the angle using the dot product
         cos_theta = torch.dot(dir1, dir2)
-        return torch.acos(torch.clamp(cos_theta, -1.0, 1.0))
+        return torch.rad2deg(torch.acos(torch.clamp(cos_theta, -1.0, 1.0)))
+    
+    def rotation(self):
+        """Calculates the exterior angle betwee the two edges in degrees, or the degrees a drone would have to rotate."""
+        return 180 - self.angle()
 
 def get_node_in_common(edge1, edge2):
     """Get the node in common between two edges."""

@@ -1,6 +1,6 @@
 # Drone Coverage Simmulation in VMAS
 
-Run `test.py` to fly the drones with teleop, using the arrow and W,A,S,D keys.
+Run `drone_simulation.py` to fly the drones with teleop, using the arrow and W,A,S,D keys.
 
 Run `aco.py` to generate an ordered list of waypoints where the total distance traveled and amount of turns is minimized.
 
