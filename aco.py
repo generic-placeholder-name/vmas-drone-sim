@@ -502,42 +502,42 @@ def optimize_aco():
 
 if __name__ == "__main__":
     # Uncomment to compare AS and MMAS performance
-    compare_aco_algorithms_1drone(30)
+    # compare_aco_algorithms_1drone(30)
 
     # Uncomment to run hyperparameter tuning
     #optimize_aco()
 
     # Uncomment to find tours for each drone around the farm
-    # _scenario.make_world(batch_dim=1, device='cpu') # "cpu" underlined but doesn't cause error
-    # _scenario.reset_world_at()
+    _scenario.make_world(batch_dim=1, device='cpu') # "cpu" underlined but doesn't cause error
+    _scenario.reset_world_at()
 
-    # penalty_areas = envConfig["penaltyAreas"] # get penalty areas from envConfig in test.py
-    # graph1 = prepare_graph([_scenario.waypoints[-2]] + _scenario.waypoints[:15], penalty_areas)
-    # graph2 = prepare_graph([_scenario.waypoints[-1]] + _scenario.waypoints[15:-2], penalty_areas)
+    penalty_areas = envConfig["penaltyAreas"] # get penalty areas from envConfig in test.py
+    graph1 = prepare_graph([_scenario.waypoints[-2]] + _scenario.waypoints[:15], penalty_areas)
+    graph2 = prepare_graph([_scenario.waypoints[-1]] + _scenario.waypoints[15:-2], penalty_areas)
 
-    # tour1, aco1 = solve_eecpp_problem(graph1, _scenario.waypoints[-2], algorithm="MMAS")
-    # tour2, aco2 = solve_eecpp_problem(graph2, _scenario.waypoints[-1], algorithm="MMAS")
+    tour1, aco1 = solve_eecpp_problem(graph1, _scenario.waypoints[-2], algorithm="MMAS")
+    tour2, aco2 = solve_eecpp_problem(graph2, _scenario.waypoints[-1], algorithm="MMAS")
 
-    # print("\nfirst tour:\n")
-    # for waypoint in tour1:
-    #     print(waypoint)
+    print("\nfirst tour:\n")
+    for waypoint in tour1:
+        print(waypoint)
     
-    # print("\nsecond tour:\n")
-    # for waypoint in tour2:
-    #     print(waypoint)
+    print("\nsecond tour:\n")
+    for waypoint in tour2:
+        print(waypoint)
 
-    # print("\nfirst tour costs\n")
-    # print(f"Total distance: {aco1.best_tour_distance}")
-    # print(f"Total degrees rotated: {aco1.best_tour_rotation}")
-    # print(f"Performance: {heuristic(aco1.best_tour_distance, aco1.best_tour_rotation)}")
-    # print(f"Number of waypoints visited: {len(aco1.best_tour_nodes[1:])} out of {len(aco1.graph.waypoints)}")
-    # print(f"Returned to start node: {aco1.best_tour_nodes[0] == aco1.best_tour_nodes[-1]}")
+    print("\nfirst tour costs\n")
+    print(f"Total distance: {aco1.best_tour_distance}")
+    print(f"Total degrees rotated: {aco1.best_tour_rotation}")
+    print(f"Performance: {heuristic(aco1.best_tour_distance, aco1.best_tour_rotation)}")
+    print(f"Number of waypoints visited: {len(aco1.best_tour_nodes[1:])} out of {len(aco1.graph.waypoints)}")
+    print(f"Returned to start node: {aco1.best_tour_nodes[0] == aco1.best_tour_nodes[-1]}")
 
-    # print("\nsecond tour costs\n")
-    # print(f"Total distance: {aco2.best_tour_distance}")
-    # print(f"Total degrees rotated: {aco2.best_tour_rotation}")
-    # print(f"Performance: {heuristic(aco2.best_tour_distance, aco2.best_tour_rotation)}")
-    # print(f"Number of waypoints visited: {len(aco2.best_tour_nodes[1:])} out of {len(aco2.graph.waypoints)}")
-    # print(f"Returned to start node: {aco2.best_tour_nodes[0] == aco2.best_tour_nodes[-1]}")
+    print("\nsecond tour costs\n")
+    print(f"Total distance: {aco2.best_tour_distance}")
+    print(f"Total degrees rotated: {aco2.best_tour_rotation}")
+    print(f"Performance: {heuristic(aco2.best_tour_distance, aco2.best_tour_rotation)}")
+    print(f"Number of waypoints visited: {len(aco2.best_tour_nodes[1:])} out of {len(aco2.graph.waypoints)}")
+    print(f"Returned to start node: {aco2.best_tour_nodes[0] == aco2.best_tour_nodes[-1]}")
     
-    # draw_aco_solution(tour1, tour2)
+    draw_aco_solution(tour1, tour2)
