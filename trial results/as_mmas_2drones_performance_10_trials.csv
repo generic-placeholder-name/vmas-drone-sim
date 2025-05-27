@@ -1,0 +1,21 @@
+Algorithm,Distance,Rotation,Energy Cost,Num Waypoints,Returned to Start
+AS,tensor(1125.9832),tensor(1488.9465),tensor(156.8232),33,True
+AS,tensor(1091.4546),tensor(1244.1477),tensor(148.5691),32,False
+AS,tensor(1091.4546),tensor(1244.1477),tensor(148.5691),32,False
+AS,tensor(1125.9832),tensor(1488.9465),tensor(156.8232),33,True
+AS,tensor(1125.9832),tensor(1488.9465),tensor(156.8232),33,True
+AS,tensor(1125.9832),tensor(1488.9465),tensor(156.8232),33,True
+AS,tensor(1048.1243),tensor(967.3116),tensor(138.7362),30,False
+AS,tensor(1091.4546),tensor(1244.1477),tensor(148.5691),32,False
+AS,tensor(1125.9832),tensor(1488.9465),tensor(156.8232),33,True
+AS,tensor(1048.1243),tensor(967.3116),tensor(138.7362),30,False
+MMAS,tensor(1091.4546),tensor(1244.1477),tensor(148.5691),32,False
+MMAS,tensor(1125.9832),tensor(1488.9465),tensor(156.8232),33,True
+MMAS,tensor(1091.4546),tensor(1244.1477),tensor(148.5691),32,False
+MMAS,tensor(1125.9832),tensor(1488.9465),tensor(156.8232),33,True
+MMAS,tensor(1091.4546),tensor(1244.1477),tensor(148.5691),32,False
+MMAS,tensor(1091.4546),tensor(1244.1477),tensor(148.5691),32,False
+MMAS,tensor(1125.9832),tensor(1488.9465),tensor(156.8232),33,True
+MMAS,tensor(1091.4546),tensor(1244.1477),tensor(148.5691),32,False
+MMAS,tensor(1091.4546),tensor(1244.1477),tensor(148.5691),32,False
+MMAS,tensor(1091.4546),tensor(1244.1477),tensor(148.5691),32,False

@@ -137,6 +137,16 @@ class Graph():
         for waypoint in self._waypoints:
             waypoint.traversed = False
 
+    def rest_weights(self, value=1.0):
+        """Reset all edge weights to a given value."""
+        for edge in self._edges:
+            edge.weight = value
+
+    def reset(self, weight_value=1.0):
+        """Reset all waypoints and edges in the graph."""
+        self.reset_traversed()
+        self.rest_weights(weight_value)
+
     def get_path_costs(self, edges=None, waypoints=None):
         """Returns total distance and total rotations of a path"""
         if edges is not None and waypoints is not None:
@@ -265,7 +275,7 @@ class Edge():
     
     @weight.setter
     def weight(self, value):
-        assert value > 0, "Weight must be positive"
+        assert value > 0, f"Weight must be positive. Got {value}."
         self._weight = torch.tensor(value, dtype=torch.float32)
 
     def add_weight(self, value):
@@ -290,7 +300,7 @@ class Edge():
 
     def estimate_length(self):
         """Estimate the length of the edge based on the distance between the two waypoints."""
-        return torch.linalg.vector_norm(self._node2.point - self._node1.point)
+        return torch.linalg.vector_norm(self._node2._point - self._node1._point)
     
     def __str__(self):
         return f"Edge({self._node1}, {self._node2}) (weight: {self.weight})"
@@ -335,7 +345,7 @@ class Elbow():
     
     @weight.setter
     def weight(self, value):
-        assert value > 0, "Weight must be positive"
+        assert value > 0, f"Weight must be positive. Got {value}."
         self._weight = torch.tensor(value, dtype=torch.float32)
 
     def add_weight(self, value):

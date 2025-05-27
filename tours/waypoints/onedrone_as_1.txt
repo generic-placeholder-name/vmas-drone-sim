@@ -1,0 +1,53 @@
+Algorithm: AS
+
+Parameters:
+params_alpha: 3.9847327418677816
+params_beta: 2.3905230832844304
+params_iter: 138
+params_n: 414
+params_rho: 0.013358823648076168
+
+first tour:
+
+goal_30(tensor([105., 150.]))
+goal_13(tensor([ 95.0000, 133.0000]))
+goal_12(tensor([95.0000, 95.0000]))
+goal_11(tensor([95.0000, 57.0000]))
+goal_10(tensor([95.0000, 19.0000]))
+goal_5(tensor([57.0000, 19.0000]))
+goal_0(tensor([19.0000, 19.0000]))
+goal_1(tensor([19.0000, 57.0000]))
+goal_6(tensor([57.0000, 57.0000]))
+goal_7(tensor([57.0000, 95.0000]))
+goal_2(tensor([19.0000, 95.0000]))
+goal_3(tensor([ 19.0000, 133.0000]))
+goal_4(tensor([ 19.0000, 171.0000]))
+goal_9(tensor([ 57.0000, 171.0000]))
+goal_14(tensor([ 95.0000, 171.0000]))
+goal_19(tensor([133.0000, 171.0000]))
+goal_24(tensor([171.0000, 171.0000]))
+goal_29(tensor([209., 171.]))
+goal_28(tensor([209., 133.]))
+goal_27(tensor([209.,  95.]))
+goal_26(tensor([209.,  57.]))
+goal_25(tensor([209.0000,  19.0000]))
+goal_20(tensor([171.0000,  19.0000]))
+goal_15(tensor([133.0000,  19.0000]))
+goal_16(tensor([133.0000,  57.0000]))
+goal_17(tensor([133.0000,  95.0000]))
+goal_21(tensor([171.0000,  57.0000]))
+goal_22(tensor([171.0000,  95.0000]))
+goal_23(tensor([171.0000, 133.0000]))
+goal_18(tensor([133.0000, 133.0000]))
+goal_30(tensor([105., 150.]))
+
+second tour:
+
+
+first tour costs
+
+Total distance: 1132.2198486328125
+Total degrees rotated: 1321.729248046875
+Performance: 0.006465950049459934
+Number of waypoints visited: 30 out of 31
+Returned to start node: True

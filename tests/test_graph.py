@@ -253,6 +253,7 @@ def test_get_path_costs(graph_with_generated_edges, edge_w1_w2, edge_w2_w3, edge
     total_rotation = graph_with_generated_edges.get_rotation(None, edge_w1_w2) + graph_with_generated_edges.get_rotation(edge_w1_w2, edge_w2_w3) + graph_with_generated_edges.get_rotation(edge_w2_w3, edge_w3_w4)
     assert graph_with_generated_edges.get_path_costs(edges=[edge_w1_w2, edge_w2_w3, edge_w3_w4]) == (total_distance, total_rotation)
 
+
 def test_remove_invalid_edges():
     penalty_areas = [{"topLeft": [2.0, 4.0], "bottomRight": [4.0, 2.0]}]
 
@@ -275,4 +276,21 @@ def test_remove_invalid_edges():
 
     assert len(g.edges) == 1 # There should be one edge to end with
 
+
+def test_reset(graph_with_generated_edges):
+    for waypoint in graph_with_generated_edges.waypoints:
+        waypoint.traversed = True
+    for edge in graph_with_generated_edges.edges:
+        edge.weight = 5
+
+    assert graph_with_generated_edges.waypoints[0].traversed
+    assert graph_with_generated_edges.edges[0].weight == 5
+
+    graph_with_generated_edges.reset()
+
+    for waypoint in graph_with_generated_edges.waypoints:
+        assert not waypoint.traversed
+    for edge in graph_with_generated_edges.edges:
+        assert edge.weight == 1.0
+        
 #endregion

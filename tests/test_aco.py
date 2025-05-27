@@ -1,6 +1,5 @@
 import pytest
 from aco import *
-import graph
 from test_graph import *
 
 def test_heuristic():
