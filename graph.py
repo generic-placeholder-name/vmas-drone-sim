@@ -71,10 +71,28 @@ class Graph():
     
     def do_lines_intersect(self, p1, p2, q1, q2):
         # Calculate cross products to see if segments intersect
-        d1 = np.cross(np.array(p2) - np.array(p1), np.array(q1) - np.array(p1))
-        d2 = np.cross(np.array(p2) - np.array(p1), np.array(q2) - np.array(p1))
-        d3 = np.cross(np.array(q2) - np.array(q1), np.array(p1) - np.array(q1))
-        d4 = np.cross(np.array(q2) - np.array(q1), np.array(p2) - np.array(q1))
+        def to_3d(vec):
+            if hasattr(vec, 'numpy'):
+                vec = vec.numpy()
+            elif not isinstance(vec, np.ndarray):
+                vec = np.asarray(vec)
+            return np.array([vec[0], vec[1], 0.0])
+
+        v1 = to_3d(p2 - p1)
+        v2 = to_3d(q1 - p1)
+        d1 = np.cross(v1, v2)[2]
+
+        v1 = to_3d(p2 - p1)
+        v2 = to_3d(q2 - p1)
+        d2 = np.cross(v1, v2)[2]
+
+        v1 = to_3d(q2 - q1)
+        v2 = to_3d(p1 - q1)
+        d3 = np.cross(v1, v2)[2]
+
+        v1 = to_3d(q2 - q1)
+        v2 = to_3d(p2 - q1)
+        d4 = np.cross(v1, v2)[2]
 
         return (d1 * d2 < 0) and (d3 * d4 < 0)
 
