@@ -92,7 +92,7 @@ def draw_paths(
         tot = 0
         for i in range(len(p) - 1): # Note: Since not all tours are closed, I'm not wrapping around for now
             elbow = Elbow(p[i], p[i + 1]) # If all tours are closed, we should wrap around to the first edge
-            tot += elbow.angle()
+            tot += elbow.rotation()
         return tot
 
     stats = []

@@ -1,4 +1,5 @@
 # Drone Coverage Simmulation in VMAS
+Use python version 3.13.
 
 Run `drone_simulation.py` to fly the drones with teleop, using the arrow and W,A,S,D keys.
 

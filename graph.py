@@ -1,10 +1,11 @@
+from shapely import buffer
 import torch
 from vmas.simulator.core import Landmark
 import numpy as np
 
 class Graph():
     """A Graph represents a collection of waypoints connected by edges."""
-    def __init__(self, waypoints=None, edges=None):
+    def __init__(self, waypoints=None, edges=None, margin=0.):
         """
         Args:
             waypoints (list): A list of Waypoints to initialize the graph with.
@@ -12,6 +13,8 @@ class Graph():
         """
         self._waypoints = waypoints if waypoints is not None else []
         self._edges = edges if edges is not None else []
+        self._margin = margin
+        self._bad_edges_to_obstacles = {} # e.g.: {edge1: [obstacle1, obstacle3], edge2: [obstacle3]}
 
         assert all(isinstance(waypoint, Waypoint) for waypoint in self._waypoints), "All waypoints must be instances of Waypoint"
         assert all(isinstance(edge, Edge) for edge in self._edges), "All edges must be instances of Edge"
@@ -23,6 +26,16 @@ class Graph():
     @property
     def edges(self):
         return self._edges
+    
+    @property
+    def margin(self):
+        return self._margin
+    
+    @margin.setter
+    def margin(self, value):
+        """Set the margin for obstacle avoidance."""
+        assert value >= 0, "Margin must be non-negative"
+        self._margin = value
 
     def generate_edges(self):
         """Generate all possible edges between waypoints."""
@@ -40,36 +53,56 @@ class Graph():
         self._edges = good_edges
         print(f"Edges after removal: {len(self._edges)}")
 
-    def edge_valid(self, edge, penalties, margin=0.08):
+    def edge_valid(self, edge, penalties):
         """Ensure edge is valid, i.e. does not go through penalty area or too close to penalty area"""
+        avoids_collision = True
         w1 = edge.node1
         w2 = edge.node2
         w1_valid = self.waypoint_valid(w1, penalties)
         w2_valid = self.waypoint_valid(w2, penalties)
+        alternate_path_waypoints = []
         if w1_valid and w2_valid:
             for penalty in penalties:
                 # New top left and bottom right with padding
-                tl = torch.tensor([penalty["topLeft"][0],penalty["topLeft"][1]]) - torch.tensor([margin, margin])
-                br = torch.tensor([penalty["bottomRight"][0],penalty["bottomRight"][1]]) + torch.tensor([margin, margin])
+                buffer_vector = torch.tensor([1, 1])
+                buffer_vector = (buffer_vector / torch.norm(buffer_vector)) * self.margin
+                tl = torch.tensor([penalty["topLeft"][0],penalty["topLeft"][1]]) - buffer_vector
+                br = torch.tensor([penalty["bottomRight"][0],penalty["bottomRight"][1]]) + buffer_vector
 
-                # Rectangle corners (clockwise order)
-                corners = [tl, torch.tensor([br[0], tl[1]]), br, torch.tensor([tl[0], br[1]])]
+                # Rectangle vertices (clockwise order)
+                vertices = [tl, torch.tensor([br[0], tl[1]]), br, torch.tensor([tl[0], br[1]])]
 
                 # Check intersection between the line and each of the rectangle's sides
                 for i in range(4):
-                    if self.do_lines_intersect(w1.point, w2.point, corners[i], corners[(i + 1) % 4]):
+                    if self.lines_intersect(w1.point, w2.point, vertices[i], vertices[(i + 1) % 4]):
                         print(f"Edge {w1} to {w2} intersects with penalty area")
-                        return False
+                        avoids_collision = False
+                        alternate_path_waypoints += [Waypoint(vertices[i], None) for i in vertices]
             # No intersection, return True for valid
-            return True
+            if avoids_collision:
+                return True
+            else:
+                #self._bad_edges_to_obstacles[edge] = extended_obstacles_in_way # TODO: This instance variable may be unecessary, consider removing it
+                return self.find_optimal_path_AStar(edge, alternate_path_waypoints)
         else:
             if not w1_valid:
                 print(f"Waypoint {w1} invalid")
             if not w2_valid:
                 print(f"Waypoint {w2} invalid")
             return False
+        
+    def find_optimal_path_AStar(self, edge, imtermediate_waypoints) -> bool:
+        """
+        Use A* algorithm to find a path around obstacles through intermediate waypoints.
+        If a path is found, return True and update the edge with that path.
+        If no path is found, return False.
+        """
+        start = edge.node1
+        end = edge.node2
+
+        return False  # TODO: Implement A* algorithm to find a path around obstacles through intermediate waypoints
     
-    def do_lines_intersect(self, p1, p2, q1, q2):
+    def lines_intersect(self, p1, p2, q1, q2):
         # Calculate cross products to see if segments intersect
         def to_3d(vec):
             if hasattr(vec, 'numpy'):
@@ -96,14 +129,14 @@ class Graph():
 
         return (d1 * d2 < 0) and (d3 * d4 < 0)
 
-    def waypoint_valid(self, waypoint, penalties, margin=0.08):
+    def waypoint_valid(self, waypoint, penalties):
         """Ensure waypoint is valid, i.e. not in penalty area or too close to penalty area"""
         point = waypoint.point
         for penalty in penalties:
-            top_left_x = penalty["topLeft"][0] - margin
-            bottom_right_x = penalty["bottomRight"][0] + margin
-            top_left_y = penalty["topLeft"][1] - margin
-            bottom_right_y = penalty["bottomRight"][1] + margin
+            top_left_x = penalty["topLeft"][0] - self.margin
+            bottom_right_x = penalty["bottomRight"][0] + self.margin
+            top_left_y = penalty["topLeft"][1] - self.margin
+            bottom_right_y = penalty["bottomRight"][1] + self.margin
             # Check if waypoint is within penalty area + margin/padding
             if (top_left_x <= point[0].item() <= bottom_right_x) and (top_left_y <= point[1].item() <= bottom_right_y):
                 # It is in penalty area, is invalid so return False
@@ -217,7 +250,7 @@ class Graph():
 
 class Waypoint():
     """A Waypoint represents a point in 2D space with an associated vmas landmark."""
-    def __init__(self, point: torch.Tensor, landmark: Landmark, reward_radius=0.01, dtype=torch.float32):
+    def __init__(self, point: torch.Tensor, landmark: Landmark | None=None, reward_radius=0.01, dtype=torch.float32):
         self._point = point
         self._landmark = landmark
         self._reward_radius = reward_radius
@@ -248,7 +281,7 @@ class Waypoint():
         self._traversed = value
     
     def __str__(self) -> str:
-        return f"{self.landmark.name}({self._point})"
+        return f"{self.landmark.name if self.landmark is not None else "None"}({self._point})"
 
 
 class Edge():

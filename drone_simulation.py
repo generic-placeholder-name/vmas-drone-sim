@@ -42,7 +42,8 @@ def convert_to_original_units(scaled_coord):
     x, y = scaled_coord
     return [x / scale + center_x, y / scale + center_y]
 
-
+droneRadius = 0.8 # approximately 0.8 meters
+dronePositionUncertainty = 1 # account for up to one meter of deviation from intended position
 envConfig = {
     "origBorders": { # for retrieval in ACO file
         "topLeft": original_top_left,
