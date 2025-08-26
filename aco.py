@@ -483,10 +483,7 @@ def prepare_graph(waypoints: List[Waypoint], penalty_areas=[], collision_margin=
     if collision_margin == None:
         collision_margin = droneRadius + dronePositionUncertainty
     graph = Graph(waypoints, margin=collision_margin)
-    graph.generate_edges()
-    bad_edges = [edge for edge in graph.edges if not graph.edge_valid(edge, penalty_areas)] # edges are bad if they do not pass edge_valid
-    graph.maneuver_around_obstacles(bad_edges, penalty_areas) # move path around obstacles maneuver
-    #graph.remove_edges(bad_edges) # remove edges that could cause a collision
+    graph.generate_edges(penalty_areas, generate_alternative_routes=True)
     return graph
     
 def optimize_aco():

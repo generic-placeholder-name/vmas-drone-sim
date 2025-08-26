@@ -1,7 +1,120 @@
-from shapely import buffer
 import torch
+from util.priority_queue import PriorityQueue
 from vmas.simulator.core import Landmark
 import numpy as np
+import copy
+
+class Waypoint():
+    """A Waypoint represents a point in 2D space with an associated vmas landmark."""
+    def __init__(self, point: torch.Tensor, landmark: Landmark | None=None, reward_radius=0.01, dtype=torch.float32):
+        self._point = point
+        self._landmark = landmark
+        self._reward_radius = reward_radius
+        self._traversed = False
+        assert self._point.shape == (2,), "Point must be a 2D tensor"
+        assert self._point.dtype == dtype, f"Point must be a {dtype} tensor"
+        assert isinstance(self._landmark, Landmark), "landmark must be an instance of Landmark"
+
+    @property
+    def point(self):
+        return self._point
+    
+    @property
+    def landmark(self):
+        return self._landmark
+    
+    @property
+    def reward_radius(self):
+        return self._reward_radius
+    
+    @property
+    def traversed(self):
+        return self._traversed
+    
+    @traversed.setter
+    def traversed(self, value):
+        assert isinstance(value, bool), "traversed must be a boolean"
+        self._traversed = value
+    
+    def __str__(self) -> str:
+        return f"{self.landmark.name if self.landmark is not None else "None"}({self._point})"
+
+
+class Edge():
+    """
+    An Edge represents a connection between two Waypoints with a specified length.
+    """
+    def __init__(self, node1: Waypoint, node2: Waypoint, length=None, weight=1.0):
+        """
+        Args:
+            node1 (Waypoint): The starting waypoint of the edge.
+            node2 (Waypoint): The ending waypoint of the edge.
+            length (float): The length of the edge (distance between the two waypoints).
+            weight (float): The weight (or favorability) of the edge.
+        """
+        self._node1 = node1
+        self._node2 = node2
+        self._length = torch.tensor(length, dtype=torch.float32) if length is not None else self.calculate_length()
+        self._weight = torch.tensor(weight, dtype=torch.float32)
+
+        assert self._length > 0, "Length must be positive"
+        assert self._weight > 0, "Weight must be positive"
+        assert isinstance(node1, Waypoint), "node1 must be an instance of Waypoint"
+        assert isinstance(node2, Waypoint), "node2 must be an instance of Waypoint"
+        assert node1 != node2, "node1 and node2 must be different Waypoints"
+        assert node1.landmark != node2.landmark, "node1 and node2 must have different landmarks"
+
+    @property
+    def node1(self):
+        return self._node1
+    
+    @property
+    def node2(self):
+        return self._node2
+    
+    @property
+    def nodes(self):
+        return self._node1, self._node2
+    
+    @property
+    def weight(self):
+        return self._weight
+    
+    @weight.setter
+    def weight(self, value):
+        assert value > 0, f"Weight must be positive. Got {value}."
+        self._weight = torch.tensor(value, dtype=torch.float32)
+
+    def add_weight(self, value):
+        self._weight += torch.tensor(value, dtype=torch.float32)
+        if self._weight < 0:
+            self._weight = torch.tensor(0.0, dtype=torch.float32)
+
+    @property
+    def length(self):
+        return self._length
+    
+    @length.setter
+    def length(self, value):
+        """
+        Update the length of the edge, just in case it is different from the estimated length (shortest path).
+        This can happen if there is an obstacle between the two waypoints.
+        Args:
+            value (float): The new length of the edge.
+        """
+        assert value > 0, "Length must be positive"
+        self._length = torch.tensor(value, dtype=torch.float32)
+
+    def calculate_length(self):
+        """Estimate the length of the edge based on the distance between the two waypoints."""
+        return torch.linalg.vector_norm(self._node2._point - self._node1._point)
+    
+    def __str__(self):
+        return f"Edge({self._node1}, {self._node2}) (weight: {self.weight})"
+    
+    def __eq__(self, other):
+        return (self.node1 == other.node1 and self.node2 == other.node2) or (self.node1 == other.node2 and self.node2 == other.node1)
+
 
 class Graph():
     """A Graph represents a collection of waypoints connected by edges."""
@@ -37,25 +150,50 @@ class Graph():
         assert value >= 0, "Margin must be non-negative"
         self._margin = value
 
-    def generate_edges(self):
+    def extend_graph(self, waypoints: list[Waypoint], edges: list[Edge]):
+        """
+        Extend the graph by adding new waypoints and edges.
+
+        :param waypoints: A list of waypoints.
+        :param edges: A list of edges.
+        """
+        assert all(isinstance(w, Waypoint) for w in waypoints)
+        assert all(isinstance(e, Edge) for e in edges)
+        assert all(w not in self._waypoints for w in waypoints)
+        assert all(e not in self._edges for e in edges)
+        assert all(e.node1 in self._waypoints + waypoints and e.node2 in self._waypoints + waypoints for e in edges), "Edges must connect waypoints that exist in the graph."
+        self._waypoints.extend(waypoints)
+        self._edges.extend(edges)
+
+    def generate_edges(self, penalty_areas, generate_alternative_routes): # TODO: Have it cal self.edge_valid so that it doesn't add an edge that goes through obstacle and adds algernative routes
         """Generate all possible edges between waypoints."""
         for i, node1 in enumerate(self._waypoints):
             for j, node2 in enumerate(self._waypoints):
                 if i != j and self.get_edge(node1, node2) is None:
                     assert node1 != node2, "repeated waypoints in self._waypoints"
                     edge = Edge(node1, node2)
-                    self.add_edge(edge)
+                    if self.edge_valid(edge, penalty_areas, create_path_around_penalties=generate_alternative_routes):
+                        self.add_edge(edge)
     
-    def remove_edges(self, bad_edges : list):
+    def remove_edges(self, bad_edges: list):
         """Remove unwanted edges from graph list"""
         print(f"Initial edges: {len(self._edges)}")
         good_edges = [edge for edge in self._edges if edge not in bad_edges]
         self._edges = good_edges
         print(f"Edges after removal: {len(self._edges)}")
 
-    def edge_valid(self, edge, penalties):
-        """Ensure edge is valid, i.e. does not go through penalty area or too close to penalty area"""
-        avoids_collision = True
+    def edge_valid(self, edge: Edge, penalties: list[dict], create_path_around_penalties: bool):
+        """
+        Ensure edge is valid, i.e. does not go through penalty area or too close to penalty area.
+        
+        :param edge: Edge to be validated.
+        :param penalties: List of dictionaries which define where penalty areas are.
+        :param create_path_around_penalties: Boolean indicating whether or not to create an alternative path
+        from waypoint 1 to waypoint 2 if a direct path would cause a collision with at least one penalty area.
+        This is accomplished by adding new waypoints and edges that go around penalty areas, optimized with A*.
+        :return: True if `edge` does not cause a collision or get too close to penalty areas, False otherwise.
+        """
+        direct_path_available = True
         w1 = edge.node1
         w2 = edge.node2
         w1_valid = self.waypoint_valid(w1, penalties)
@@ -64,8 +202,8 @@ class Graph():
         if w1_valid and w2_valid:
             for penalty in penalties:
                 # New top left and bottom right with padding
-                buffer_vector = torch.tensor([1, 1])
-                buffer_vector = (buffer_vector / torch.norm(buffer_vector)) * self.margin
+                buffer_vector = torch.tensor([self.margin / torch.tensor(2).sqrt(), self.margin / torch.sqrt(torch.tensor(2))])
+                assert buffer_vector.pow(2).sum().sqrt() == self.margin, f"Expected the magnitude of `buffer_vector` to be equal to the margin: {self.margin}. Got: {buffer_vector.pow(2).sum().sqrt()}."
                 tl = torch.tensor([penalty["topLeft"][0],penalty["topLeft"][1]]) - buffer_vector
                 br = torch.tensor([penalty["bottomRight"][0],penalty["bottomRight"][1]]) + buffer_vector
 
@@ -76,14 +214,27 @@ class Graph():
                 for i in range(4):
                     if self.lines_intersect(w1.point, w2.point, vertices[i], vertices[(i + 1) % 4]):
                         print(f"Edge {w1} to {w2} intersects with penalty area")
-                        avoids_collision = False
-                        alternate_path_waypoints += [Waypoint(vertices[i], None) for i in vertices]
+                        direct_path_available = False
+                        potential_waypoints = [Waypoint(vertices[i], None) for i in vertices]
+                        for w in potential_waypoints:
+                            if self.waypoint_valid(w, penalties):
+                                alternate_path_waypoints.append(w)
             # No intersection, return True for valid
-            if avoids_collision:
+            if direct_path_available:
                 return True
             else:
                 #self._bad_edges_to_obstacles[edge] = extended_obstacles_in_way # TODO: This instance variable may be unecessary, consider removing it
-                return self.find_optimal_path_AStar(edge, alternate_path_waypoints)
+                if create_path_around_penalties:
+                    potential_graph = copy.deepcopy(self)
+                    potential_graph.extend_graph(alternate_path_waypoints, edges=[])
+                    potential_graph.generate_edges(penalties, generate_alternative_routes=False) # Excludes edges that could cause a collision
+                    a_star_path = self.find_optimal_path_AStar(w1, w2, potential_graph)
+                    if a_star_path is not None:
+                        waypoints, edges = a_star_path[0], a_star_path[1]
+                        self.extend_graph(waypoints, edges) # TODO: Currently, will throw error if try to pass in waypoints and edges that already existed. Modify extend_graph.
+                    else:
+                        print(f"Unable to generate an alternative path from waypoint {w1} to {w2}.")
+                return False
         else:
             if not w1_valid:
                 print(f"Waypoint {w1} invalid")
@@ -91,17 +242,60 @@ class Graph():
                 print(f"Waypoint {w2} invalid")
             return False
         
-    def find_optimal_path_AStar(self, edge, imtermediate_waypoints) -> bool:
+    def find_optimal_path_AStar(self, start: Waypoint, goal: Waypoint, graph: "Graph") -> tuple[list[Waypoint], list[Edge]] | None:
         """
         Use A* algorithm to find a path around obstacles through intermediate waypoints.
         If a path is found, return True and update the edge with that path.
         If no path is found, return False.
         """
-        start = edge.node1
-        end = edge.node2
+        assert isinstance(start, Waypoint)
+        assert isinstance(goal, Waypoint)
+        frontier = PriorityQueue()
+        frontier.put(start, 0.)
+        came_from = dict()
+        cost_so_far = dict()
+        came_from[start] = None
+        cost_so_far[start] = 0.
+        current = None
 
-        return False  # TODO: Implement A* algorithm to find a path around obstacles through intermediate waypoints
-    
+        while not frontier.empty():
+            current = frontier.get()
+            assert isinstance(current, Waypoint)
+            if current == goal:
+                break
+
+            for next, _ in graph.get_neighbors(current):
+                assert isinstance(next, Waypoint)
+                edge = graph.get_edge(current, next)
+                assert isinstance(edge, Edge)
+                edge_cost = edge.length
+                new_cost = cost_so_far[current] + edge_cost
+                
+                if next not in cost_so_far or new_cost < cost_so_far[next]:
+                    cost_so_far[next] = new_cost
+                    priority = new_cost + graph.distance(next, goal) # f(n) = g(n) + h(n)
+                    frontier.put(next, priority)
+                    came_from[next] = current
+        
+
+        if current != goal:
+            return None
+        assert isinstance(current, Waypoint)
+        waypoints = [current]
+        edges = []
+        while current != start:
+            previous = came_from[current]
+            edge = graph.get_edge(previous, current)
+            assert isinstance(edge, Edge)
+            edges.append(edge)
+            current = previous
+            waypoints.append(current)
+        
+        assert all(isinstance(w, Waypoint) for w in waypoints)
+        assert all(isinstance(e, Edge) for e in edges)
+        
+        return waypoints, edges
+
     def lines_intersect(self, p1, p2, q1, q2):
         # Calculate cross products to see if segments intersect
         def to_3d(vec):
@@ -129,6 +323,17 @@ class Graph():
 
         return (d1 * d2 < 0) and (d3 * d4 < 0)
 
+    def distance(self, node1: Waypoint, node2: Waypoint) -> float:
+        """
+        Straight-line distance between two waypoints.
+
+        :param node1: A Waypoint different from `node2`.
+        :param node2: A Waypoint different from `node1`.
+        :return: A float representing the straight-line distance between `node1` and `node2`.
+        """
+        point1, point2 = node1.point, node2.point
+        return torch.linalg.vector_norm(point2 - point1)
+
     def waypoint_valid(self, waypoint, penalties):
         """Ensure waypoint is valid, i.e. not in penalty area or too close to penalty area"""
         point = waypoint.point
@@ -152,8 +357,14 @@ class Graph():
         if self.get_edge(edge.node1, edge.node2) is None:
             self._edges.append(edge)
 
-    def get_edge(self, node1, node2):
-        """Get an edge by its two connected waypoints."""
+    def get_edge(self, node1: Waypoint, node2: Waypoint) -> Edge | None:
+        """
+        Get an edge by its two connected waypoints.
+        
+        :param node1: Waypoint connected to `node2` via an edge.
+        :param node2: Waypoint connected to `node1` via an edge.
+        :return: An edge connecting `node1` and `node2`.
+        """
         temp_edge = Edge(node1, node2)
         for edge in self._edges:
             if edge == temp_edge:
@@ -164,8 +375,13 @@ class Graph():
         """Get all edges connected to a waypoint."""
         return [edge for edge in self._edges if edge.node1 == node or edge.node2 == node]
 
-    def get_neighbors(self, node, exclude_traversed=False):
-        """Get all neighbors of a waypoint."""
+    def get_neighbors(self, node: Waypoint, exclude_traversed: bool=False) -> tuple[list[Waypoint], list[Edge]]:
+        """
+        Get all neighbors of a waypoint.
+        
+        :param node: A Waypoint in the graph.
+        :return: A tuple where the first element is a list of Waypoint instances and the second element is a list of Edge instances.
+        """
         node_neighbors = []
         edge_neighbors = []
         for edge in self.get_edges(node):
@@ -247,118 +463,6 @@ class Graph():
             str += f"{edge}\n"
         return str
     
-
-class Waypoint():
-    """A Waypoint represents a point in 2D space with an associated vmas landmark."""
-    def __init__(self, point: torch.Tensor, landmark: Landmark | None=None, reward_radius=0.01, dtype=torch.float32):
-        self._point = point
-        self._landmark = landmark
-        self._reward_radius = reward_radius
-        self._traversed = False
-        assert self._point.shape == (2,), "Point must be a 2D tensor"
-        assert self._point.dtype == dtype, f"Point must be a {dtype} tensor"
-        assert isinstance(self._landmark, Landmark), "landmark must be an instance of Landmark"
-
-    @property
-    def point(self):
-        return self._point
-    
-    @property
-    def landmark(self):
-        return self._landmark
-    
-    @property
-    def reward_radius(self):
-        return self._reward_radius
-    
-    @property
-    def traversed(self):
-        return self._traversed
-    
-    @traversed.setter
-    def traversed(self, value):
-        assert isinstance(value, bool), "traversed must be a boolean"
-        self._traversed = value
-    
-    def __str__(self) -> str:
-        return f"{self.landmark.name if self.landmark is not None else "None"}({self._point})"
-
-
-class Edge():
-    """
-    An Edge represents a connection between two Waypoints with a specified length.
-    """
-    def __init__(self, node1: Waypoint, node2: Waypoint, length=None, weight=1.0):
-        """
-        Args:
-            node1 (Waypoint): The starting waypoint of the edge.
-            node2 (Waypoint): The ending waypoint of the edge.
-            length (float): The length of the edge (distance between the two waypoints).
-            weight (float): The weight (or favorability) of the edge.
-        """
-        self._node1 = node1
-        self._node2 = node2
-        self._length = torch.tensor(length, dtype=torch.float32) if length is not None else self.estimate_length()
-        self._weight = torch.tensor(weight, dtype=torch.float32)
-
-        assert self._length > 0, "Length must be positive"
-        assert self._weight > 0, "Weight must be positive"
-        assert isinstance(node1, Waypoint), "node1 must be an instance of Waypoint"
-        assert isinstance(node2, Waypoint), "node2 must be an instance of Waypoint"
-        assert node1 != node2, "node1 and node2 must be different Waypoints"
-        assert node1.landmark != node2.landmark, "node1 and node2 must have different landmarks"
-
-    @property
-    def node1(self):
-        return self._node1
-    
-    @property
-    def node2(self):
-        return self._node2
-    
-    @property
-    def nodes(self):
-        return self._node1, self._node2
-    
-    @property
-    def weight(self):
-        return self._weight
-    
-    @weight.setter
-    def weight(self, value):
-        assert value > 0, f"Weight must be positive. Got {value}."
-        self._weight = torch.tensor(value, dtype=torch.float32)
-
-    def add_weight(self, value):
-        self._weight += torch.tensor(value, dtype=torch.float32)
-        if self._weight < 0:
-            self._weight = torch.tensor(0.0, dtype=torch.float32)
-
-    @property
-    def length(self):
-        return self._length
-    
-    @length.setter
-    def length(self, value):
-        """
-        Update the length of the edge, just in case it is different from the estimated length (shortest path).
-        This can happen if there is an obstacle between the two waypoints.
-        Args:
-            value (float): The new length of the edge.
-        """
-        assert value > 0, "Length must be positive"
-        self._length = torch.tensor(value, dtype=torch.float32)
-
-    def estimate_length(self):
-        """Estimate the length of the edge based on the distance between the two waypoints."""
-        return torch.linalg.vector_norm(self._node2._point - self._node1._point)
-    
-    def __str__(self):
-        return f"Edge({self._node1}, {self._node2}) (weight: {self.weight})"
-    
-    def __eq__(self, other):
-        return (self.node1 == other.node1 and self.node2 == other.node2) or (self.node1 == other.node2 and self.node2 == other.node1)
-
 class Elbow():
     """An Elbow is a connection between two edges, where the first edge ends at the second edge's start node."""
     def __init__(self, previous_edge: Edge, edge: Edge, weight=1.0):
