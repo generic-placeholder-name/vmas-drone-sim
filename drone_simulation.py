@@ -16,11 +16,8 @@ if typing.TYPE_CHECKING:
 # Coordinates taken from image on Google Docs.
 # Reward areas are areas with crops; penalty areas are the house and the greenhouse
 # Original frame coordinates
-# original_top_left = [181, 7]
-# original_bottom_right = [486, 253]
-# Changed to meters x meters of farm, measured from google maps
 original_top_left = [0, 0]
-original_bottom_right = [245, 190]
+original_bottom_right = [144, 96]
 
 original_width = original_bottom_right[0] - original_top_left[0]
 original_height = original_bottom_right[1] - original_top_left[1]
@@ -52,61 +49,23 @@ envConfig = {
         "topLeft": scale_coordinate(original_top_left),
         "bottomRight": scale_coordinate(original_bottom_right)
     },
-    "rewardAreas": [
-        [scale_coordinate([0, 0]), 
-         scale_coordinate([original_width, 0]), 
-         scale_coordinate([original_width, original_height]), 
-         scale_coordinate([0, original_height])]
-        # [scale_coordinate(coord) for coord in [
-        #     [187, 130], [241, 153], [265, 153], [261, 240], [184, 239]
-        # ]],
-        # [scale_coordinate(coord) for coord in [
-        #     [213, 58], [229, 57], [244, 77], [274, 78], [305, 67], [293, 140], [255, 140], [204, 120]
-        # ]],
-        # [scale_coordinate(coord) for coord in [
-        #     [311, 58], [360, 60], [360, 140], [303, 140]
-        # ]],
-        # [scale_coordinate(coord) for coord in [
-        #     [365, 16], [471, 15], [475, 87], [364, 89]
-        # ]],
-        # [scale_coordinate(coord) for coord in [
-        #     [372, 173], [477, 174], [480, 240], [370, 241]
-        # ]],
-        # [scale_coordinate(coord) for coord in [
-        #     [381, 98], [476, 92], [479, 166], [382, 164]
-        # ]]
-    ],
-    "penaltyAreas": [ 
-        {
-            #Second coordinate is subtracted because  value, i.e. 500, was measured from top-left of image, vmas wants it from bottom left
-            "topLeft": [107, original_height-152],  
-            "bottomRight": [130, original_height-122],
-            "type": "box"
-        },
-        {
-            "topLeft": [148, original_height-104],
-            "bottomRight": [160, original_height-74],
-            "type": "box"
-        },
-        {
-            "topLeft": [107, original_height-183],
-            "bottomRight": [122, original_height-168],
-            "type": "circle",
-        },
-        {
-            "topLeft": [53, original_height-61],
-            "bottomRight": [69, original_height-46],
-            "type": "circle",
-        }
-    ],
+    # grid config: cols x rows and obstacles as (col,row) 1-based indices
+    "grid": {
+        "cols": 12,
+        "rows": 8,
+        "obstacles": [
+            (2,2), (3,2), (3,7), (4,4), (5,5), (5,6), (6,5), (6,6),
+            (9,3), (9,4), (9,5), (9,7), (9,8), (10,3), (10,7)
+        ]
+    },
+    # starting points (still in scaled coords)
     "startingPoints": [
-        scale_coordinate([105, 150]),
-        scale_coordinate([125, 150])
+        scale_coordinate([18, 18]),
+        scale_coordinate([144-18, 96-18])
     ]
 }
 
-# In polygon check (useful for distributing reward points)
-# Uses matplotlib (which is probably not the best)
+# In polygon check (useful for distributing reward points) - left for reference
 from matplotlib.path import Path
 def is_point_in_polygon(point, polygon_coords):
     """
@@ -136,7 +95,7 @@ class Scenario(BaseScenario):
         self.reward_radius = 0.01
         self.visualize_semidims = True
 
-        # Extract world dimensions from envConfig
+        # Extract world dimensions from envConfig (these are scaled coords)
         world_width = self.env_config["borders"]["bottomRight"][0]
         world_height = self.env_config["borders"]["bottomRight"][1]
 
@@ -173,26 +132,64 @@ class Scenario(BaseScenario):
         print(f"World height: {world_height} \
               \nWorld width: {world_width}\n")
         
-        # Generate goal (waypoints) points in reward areas
-        for x in torch.arange(-world_width + self.grid_resolution, world_width, self.grid_resolution*2):
-            for y in torch.arange(-world_height + self.grid_resolution, world_height, self.grid_resolution*2):
-                point = [x.item(), y.item()]
-                for reward_area in self.env_config["rewardAreas"]:
-                    if is_point_in_polygon(point, reward_area): # TODO: Check that point not in penalty areas
-                        print("Is in reward area\n")
-                        goal = Landmark(
-                            name=f"goal_{len(self.waypoints)}",
-                            collide=False,
-                            shape=Sphere(radius=self.reward_radius),
-                            color=Color.LIGHT_GREEN,
-                        )
-                        # if agent in point
-                        world.add_landmark(goal)
-                        self.waypoints.append(Waypoint(torch.tensor(convert_to_original_units(point), device=device), goal, reward_radius=self.reward_radius))
-                        print(f"Waypoint {len(self.waypoints)-1} created at {point} = {convert_to_original_units(point)}")
-                        break
+        # --- GRID-BASED WAYPOINT + OBSTACLE GENERATION ---
+        grid = self.env_config["grid"]
+        cols = int(grid["cols"])
+        rows = int(grid["rows"])
+        obstacle_cells = { (int(c), int(r)) for (c,r) in grid["obstacles"] }  # 1-based indices
 
-        # Generate waypoints at start locations
+        # semidims are world_width (positive). Total width = 2*world_width
+        total_w = (world_width * 2).item() if isinstance(world_width, torch.Tensor) else (2 * world_width)
+        total_h = (world_height * 2).item() if isinstance(world_height, torch.Tensor) else (2 * world_height)
+
+        # cell sizes (in scaled coordinate units)
+        cell_w = world_width * 2 / cols
+        cell_h = world_height * 2 / rows
+
+        # Precompute centers in scaled coords. index (col,row): col=1..cols left->right, row=1..rows bottom->top
+        for col in range(1, cols + 1):
+            for row in range(1, rows + 1):
+                # compute center in scaled coordinates (x,y)
+                # left-most center: -world_width + cell_w/2
+                center_x_scaled = -world_width + (col - 0.5) * cell_w
+                center_y_scaled = -world_height + (row - 0.5) * cell_h
+
+                # If this cell is an obstacle, create obstacle landmark occupying the entire cell
+                if (col, row) in obstacle_cells:
+                    length = cell_w
+                    width = cell_h
+                    obstacle_shape = Box(length=length.item() if isinstance(length, torch.Tensor) else length,
+                                         width=width.item() if isinstance(width, torch.Tensor) else width)
+                    obstacle = Landmark(
+                        name=f"obstacle_cell_{col}_{row}",
+                        collide=True,
+                        movable=False,
+                        shape=obstacle_shape,
+                        color=Color.RED,
+                        collision_filter=lambda e: not isinstance(e.shape, Box),
+                    )
+                    world.add_landmark(obstacle)
+                    # store obstacle center (scaled) for reset positioning
+                    self.obs_pos.append(torch.tensor([center_x_scaled, center_y_scaled], device=device))
+                    print(f"Added obstacle at cell ({col},{row}) center scaled {center_x_scaled, center_y_scaled}")
+                else:
+                    # create a waypoint landmark at the cell center (these are reward points)
+                    goal = Landmark(
+                        name=f"goal_{len(self.waypoints)}",
+                        collide=False,
+                        shape=Sphere(radius=self.reward_radius),
+                        color=Color.LIGHT_GREEN,
+                    )
+                    world.add_landmark(goal)
+                    # store waypoint position in *original* units, consistent with existing code: Waypoint expects original units
+                    original_units = convert_to_original_units((center_x_scaled.item(), center_y_scaled.item()))
+                    self.waypoints.append(Waypoint(torch.tensor(original_units, device=device), goal, reward_radius=self.reward_radius))
+                    print(f"Waypoint {len(self.waypoints)-1} created at scaled ({center_x_scaled.item()}, {center_y_scaled.item()}) -> original {original_units}")
+
+        # waypoint_visits sized by number of waypoints generated
+        self.waypoint_visits = torch.zeros([self.n_agents, len(self.waypoints)], device=device)  # Track waypoints visited by each drone
+        
+        # Generate waypoints at start locations (keeps original behavior)
         for (x, y) in self.agent_start_pos:
             point = [x.item(), y.item()]
             goal = Landmark(
@@ -201,41 +198,12 @@ class Scenario(BaseScenario):
                 shape=Sphere(radius=self.reward_radius),
                 color=Color.LIGHT_GREEN,
             )
-            # if agent in point
             world.add_landmark(goal)
             self.waypoints.append(Waypoint(torch.tensor(convert_to_original_units(point), device=device), goal, reward_radius=self.reward_radius))
             print(f"Waypoint {len(self.waypoints)-1} created at {point} = {convert_to_original_units(point)}")
 
-        self.waypoint_visits = torch.zeros([self.n_agents, len(self.waypoints)], device=device)  # Track waypoints visited by each drone
-        
-        # Add penalty areas as landmarks
-        for i, penalty_area in enumerate(self.env_config["penaltyAreas"]):
-            top_left = scale_coordinate(penalty_area["topLeft"])
-            bottom_right = scale_coordinate(penalty_area["bottomRight"])
-            length = bottom_right[0] - top_left[0]
-            width = bottom_right[1] - top_left[1]
-            center = [(top_left[0] + bottom_right[0]) / 2, (top_left[1] + bottom_right[1]) / 2]
-            obstacle_shape=Box(length=length.item(), width=width.item())
-            if penalty_area["type"]=="circle":
-                radius = length/4 # The original divides by 2 (I assume this is erroneous, but I will divide it by 4 to match)
-                obstacle_shape=Sphere(radius.item())
-            # else:
-            #     obstacle_shape=Box(length=length*2, width=width*2), # Need to multiply by two due to nature of vmas coordinate system
-
-            print(f"Obstacle width: {width}, length: {length}, center: {center}")
-
-            obstacle = Landmark(
-                name=f"obstacle_{i}",
-                collide=True,  # Penalty areas are collidable
-                movable=False,
-                shape=obstacle_shape, # Need to multiply by two due to nature of vmas coordinate system
-                color=Color.RED,
-                collision_filter=lambda e: not isinstance(e.shape, Box),
-            )
-            
-            world.add_landmark(obstacle)
-            self.obs_pos.append(torch.tensor(center, device=device))
-
+        # Note: obstacles were added earlier; obs_pos contains their scaled centers in the same order as the landmarks appended.
+        # prev_positions and distance trackers
         self.prev_positions = [agent.state.pos for agent in self.world.agents]
         self.total_distance = torch.zeros(len(self.world.agents), device=device)
         
@@ -263,25 +231,16 @@ class Scenario(BaseScenario):
             )
         for i, obstacle in enumerate(obstacles):
             obstacle.set_pos(
- 
                 self.obs_pos[i],
- 
                 batch_index=env_index,
- 
             )
 
     def reward(self, agent: Agent):
         agent_index = self.get_agent_index(agent)
-        # reward = torch.zeros(
-        #     self.world.batch_dim,
-        #     device=self.world.device,
-        #     dtype=torch.float32,
-        #     )
         # Track whether the agent is currently on a waypoint
         for i, landmark in enumerate(self.world.landmarks):
             if landmark.state.pos is not None and agent.state.pos is not None:
                 if landmark.name.startswith("goal"):
-                    # print(i, landmark.state.pos, agent.state.pos, torch.linalg.vector_norm(landmark.state.pos - agent.state.pos), self.reward_radius)
                     if self.world.is_overlapping(agent, landmark) and self.waypoint_visits[agent_index, i] == 0:
                         waypoint_index = self.get_waypoint_index(landmark)
                         self.cumulative_reward += 1.0
@@ -335,8 +294,6 @@ class Scenario(BaseScenario):
             angular_displacement = current_rot - prev_rot  # Gets change in rotation
             # Handle if rotation goes from 2π to 0
             angular_displacement = (angular_displacement + torch.pi) % (2 * torch.pi) - torch.pi
-            # Change angular displacement from radians to degrees
-            # angular_displacement_degrees = angular_displacement * (180 / torch.pi)
 
             # Add absolute value angular displacement
             self.total_rotation[agent_index] += torch.abs(angular_displacement)
