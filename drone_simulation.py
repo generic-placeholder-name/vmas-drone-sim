@@ -60,8 +60,8 @@ envConfig = {
     },
     # starting points (still in scaled coords)
     "startingPoints": [
-        scale_coordinate([18, 18]),
-        scale_coordinate([144-18, 96-18])
+        scale_coordinate([6, 6]),
+        scale_coordinate([144-6, 96-6])
     ]
 }
 
@@ -155,6 +155,47 @@ class Scenario(BaseScenario):
                 center_y_scaled = -world_height + (row - 0.5) * cell_h
 
                 # If this cell is an obstacle, create obstacle landmark occupying the entire cell
+                if (col, row) not in obstacle_cells:
+                    # create a waypoint landmark at the cell center (these are reward points)
+                    goal = Landmark(
+                        name=f"goal_{len(self.waypoints)}",
+                        collide=False,
+                        shape=Sphere(radius=self.reward_radius),
+                        color=Color.LIGHT_GREEN,
+                    )
+                    world.add_landmark(goal)
+                    # store waypoint position in *original* units, consistent with existing code: Waypoint expects original units
+                    original_units = convert_to_original_units((center_x_scaled.item(), center_y_scaled.item()))
+                    self.waypoints.append(Waypoint(torch.tensor(original_units, device=device), goal, reward_radius=self.reward_radius))
+                    print(f"Waypoint {len(self.waypoints)-1} created at scaled ({center_x_scaled.item()}, {center_y_scaled.item()}) -> original {original_units}")
+
+        # waypoint_visits sized by number of waypoints generated
+        self.waypoint_visits = torch.zeros([self.n_agents, len(self.waypoints)], device=device)  # Track waypoints visited by each drone
+        
+        # Generate waypoints at start locations 
+        """
+        for (x, y) in self.agent_start_pos:
+            point = [x.item(), y.item()]
+            goal = Landmark(
+                name=f"goal_{len(self.waypoints)}",
+                collide=False,
+                shape=Sphere(radius=self.reward_radius),
+                color=Color.LIGHT_GREEN,
+            )
+            world.add_landmark(goal)
+            self.waypoints.append(Waypoint(torch.tensor(convert_to_original_units(point), device=device), goal, reward_radius=self.reward_radius))
+            print(f"Waypoint {len(self.waypoints)-1} created at {point} = {convert_to_original_units(point)}")
+        """
+
+        # Obstacle creation (I have to do this after waypoints to keep order consistent)
+        for col in range(1, cols + 1):
+            for row in range(1, rows + 1):
+                # compute center in scaled coordinates (x,y)
+                # left-most center: -world_width + cell_w/2
+                center_x_scaled = -world_width + (col - 0.5) * cell_w
+                center_y_scaled = -world_height + (row - 0.5) * cell_h
+
+                # If this cell is an obstacle, create obstacle landmark occupying the entire cell
                 if (col, row) in obstacle_cells:
                     length = cell_w
                     width = cell_h
@@ -172,35 +213,6 @@ class Scenario(BaseScenario):
                     # store obstacle center (scaled) for reset positioning
                     self.obs_pos.append(torch.tensor([center_x_scaled, center_y_scaled], device=device))
                     print(f"Added obstacle at cell ({col},{row}) center scaled {center_x_scaled, center_y_scaled}")
-                else:
-                    # create a waypoint landmark at the cell center (these are reward points)
-                    goal = Landmark(
-                        name=f"goal_{len(self.waypoints)}",
-                        collide=False,
-                        shape=Sphere(radius=self.reward_radius),
-                        color=Color.LIGHT_GREEN,
-                    )
-                    world.add_landmark(goal)
-                    # store waypoint position in *original* units, consistent with existing code: Waypoint expects original units
-                    original_units = convert_to_original_units((center_x_scaled.item(), center_y_scaled.item()))
-                    self.waypoints.append(Waypoint(torch.tensor(original_units, device=device), goal, reward_radius=self.reward_radius))
-                    print(f"Waypoint {len(self.waypoints)-1} created at scaled ({center_x_scaled.item()}, {center_y_scaled.item()}) -> original {original_units}")
-
-        # waypoint_visits sized by number of waypoints generated
-        self.waypoint_visits = torch.zeros([self.n_agents, len(self.waypoints)], device=device)  # Track waypoints visited by each drone
-        
-        # Generate waypoints at start locations (keeps original behavior)
-        for (x, y) in self.agent_start_pos:
-            point = [x.item(), y.item()]
-            goal = Landmark(
-                name=f"goal_{len(self.waypoints)}",
-                collide=False,
-                shape=Sphere(radius=self.reward_radius),
-                color=Color.LIGHT_GREEN,
-            )
-            world.add_landmark(goal)
-            self.waypoints.append(Waypoint(torch.tensor(convert_to_original_units(point), device=device), goal, reward_radius=self.reward_radius))
-            print(f"Waypoint {len(self.waypoints)-1} created at {point} = {convert_to_original_units(point)}")
 
         # Note: obstacles were added earlier; obs_pos contains their scaled centers in the same order as the landmarks appended.
         # prev_positions and distance trackers
