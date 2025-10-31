@@ -102,6 +102,11 @@ envConfig = {
     "startingPoints": [
         scale_coordinate([105, 150]),
         scale_coordinate([125, 150])
+    ],
+        "boidStartingPoints": [
+        scale_coordinate([130, 110]),
+        scale_coordinate([110, 120]),
+        scale_coordinate([90, 110])
     ]
 }
 
@@ -131,6 +136,7 @@ class Scenario(BaseScenario):
         self.agent_u_multiplier = kwargs.pop("agent_u_multiplier", 0.05)
         ScenarioUtils.check_kwargs_consumed(kwargs)
 
+        self.n_boids = 3
         self.n_agents = 2
         self.agent_radius = 0.03333
         self.reward_radius = 0.01
@@ -143,10 +149,14 @@ class Scenario(BaseScenario):
         self.waypoints = []
         self.obs_pos = []
         self.agent_start_pos = []
+        self.boid_start_pos = []
         self.last_waypoint = {i: None for i in range(self.n_agents)}
         # Make world
         world = World(batch_dim, device, x_semidim=world_width, y_semidim=world_height)
         self._world = world
+        # # make boids list on world
+        # self.boids: list[Agent] = []
+        # self._world.boids = self.boids
         world_dims = torch.tensor([world_width, world_height])
         self.cumulative_reward = torch.zeros(
             self.world.batch_dim,
@@ -167,6 +177,21 @@ class Scenario(BaseScenario):
             )
             world.add_agent(agent)
             self.agent_start_pos.append(torch.tensor(self.env_config["startingPoints"][i], device=device))
+
+        # Add agents
+        for i in range(self.n_boids):
+            boid = Agent(
+                name=f"boid_{i}",
+                collide=True,
+                render_action=True,
+                u_range=[1, 1],
+                u_multiplier=[0.05, 0.5], #[linear, angular]
+                shape=Box(length=0.12, width=0.12),
+                dynamics=DiffDrive(world, integration="rk4"),
+                color=Color.BLACK,
+            )
+            world.add_agent(boid)
+            self.boid_start_pos.append(torch.tensor(self.env_config["boidStartingPoints"][i], device=device))
         
         self.total_rotation = torch.zeros(len(self.world.agents), device=device)  # Track total rotation for each agent
         self.prev_rotations = [agent.state.rot for agent in self.world.agents]  # Track previous rotation for each agent
@@ -244,6 +269,7 @@ class Scenario(BaseScenario):
     def reset_world_at(self, env_index: int | None = None):
         n_goals = len(self.waypoints)
         agents = [self.world.agents[i] for i in torch.randperm(self.n_agents).tolist()]
+        boids = [self.world.boids[i] for i in torch.randperm(self.n_boids).tolist()]
         goals = [self.world.landmarks[i] for i in torch.range(start=0,end=n_goals-1,dtype=int).tolist()]
         order = range(len(self.world.landmarks[n_goals :]))
         obstacles = [self.world.landmarks[n_goals :][i] for i in order]
@@ -261,6 +287,13 @@ class Scenario(BaseScenario):
                 self.agent_start_pos[i],#self.world.agents[i].state.pos,
                 batch_index=env_index,
             )
+        
+        for i, boid in enumerate(boids):
+            boid.set_pos(
+                self.boid_start_pos[i],
+                batch_index=env_index,
+            )
+
         for i, obstacle in enumerate(obstacles):
             obstacle.set_pos(
  
