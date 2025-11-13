@@ -157,7 +157,7 @@ class Scenario(BaseScenario):
         self.n_boids = 3
         self.boids = []
         self.boid_start_pos = []
-        self.min_distance_between_entities = 0.15
+        self.min_distance_between_entities = 0.22
         self.x_bounds = world_width
         self.y_bounds = world_height
 
@@ -189,11 +189,6 @@ class Scenario(BaseScenario):
             )
             world.add_agent(boid)
             self.boids.append(boid)
-
-        print("world.agents:", [a.name for a in world.agents])
-        print("self.world.agents:", [a.name for a in self.world.agents])
-        print("Number of boids:", self.n_boids)
-        print(f"World height: {world_height}\nWorld width: {world_width}\n")
         
         self.total_rotation = torch.zeros(self.n_drones, device=device)  # Track total rotation for each drone
         self.prev_rotations = [drone.state.rot for drone in self.world.agents[: self.n_drones]]  # Track previous rotation for each drone
