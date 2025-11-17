@@ -260,24 +260,27 @@ class Scenario(BaseScenario):
 
         self.prev_positions = [drone.state.pos for drone in self.world.agents[: self.n_drones]]
         self.total_distance = torch.zeros(self.n_drones, device=device)
-        self.spawn_boids(env_index=None)
+        self.spawn_boids()
         
         return world
     
     
-    def spawn_boids(self, env_index: int | None = None):
-            batch_size = self.world.batch_dim if env_index is None else 1
+    def spawn_boids(self):
+            # Scenario only uses a single enviornment, so we always spawn in env_index = 0
+            env_index = 0
+            batch_size = self.world.batch_dim
             occupied_positions_list = []
 
             for agent in self.world.agents:
                 if agent.name.startswith("drone_"):
-                    #  pos shape: [batch_size, 2] -> pos shape: [batch_size, 1, 2]
-                    pos = agent.state.pos.unsqueeze(1)
+                    assert agent.state.pos is not None
+                    assert torch.is_tensor(agent.state.pos)
+                    pos = agent.state.pos.unsqueeze(1) # [batch_size, 2] -> pos shape: [batch_size, 1, 2]
                     occupied_positions_list.append(pos)
-
-            for obs_pos in self.obs_pos:
+                    
+            for object_pos in self.obs_pos:
                 # pos shape: [2] -> pos shape: [batch_size, 2]
-                pos = obs_pos.to(self.world.device).expand(batch_size, -1)
+                pos = object_pos.to(self.world.device).expand(batch_size, -1)
                 #  pos shape: [batch_size, 2] -> pos shape: [batch_size, 1, 2]
                 pos = pos.unsqueeze(1)
                 occupied_positions_list.append(pos)
@@ -329,7 +332,7 @@ class Scenario(BaseScenario):
  
             )
         
-        self.spawn_boids(env_index=None)
+        self.spawn_boids()
 
 
     def reward(self, drone: Agent):
@@ -456,5 +459,5 @@ class Scenario(BaseScenario):
 
 if __name__ == "__main__":
     render_interactively(
-        Scenario(), control_two_drones=True, shared_reward=True
+        Scenario(), control_two_agents=True, shared_reward=True
     )
