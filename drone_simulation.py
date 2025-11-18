@@ -290,7 +290,7 @@ class Scenario(BaseScenario):
                 # get [batch_size, K, 2] where K is the number of occupied entities
                 occupied_positions = torch.cat(occupied_positions_list, dim=1)
             else:
-                occupied_positions = None
+                occupied_positions = torch.Tensor()
 
             ScenarioUtils.spawn_entities_randomly(
                 entities=self.boids,
@@ -306,7 +306,7 @@ class Scenario(BaseScenario):
     def reset_world_at(self, env_index: int | None = None):
         n_goals = len(self.waypoints)
         drones = [self.world.agents[i] for i in torch.randperm(self.n_drones).tolist()]
-        goals = [self.world.landmarks[i] for i in torch.range(start=0,end=n_goals-1,dtype=int).tolist()]
+        goals = [self.world.landmarks[i] for i in torch.range(start=0,end=n_goals-1,dtype=torch.int).tolist()]
         order = range(len(self.world.landmarks[n_goals :]))
         obstacles = [self.world.landmarks[n_goals :][i] for i in order]
         self.waypoint_visits = torch.zeros([self.n_drones, len(self.waypoints)], device=self.world.device) # reset the counter
@@ -335,15 +335,15 @@ class Scenario(BaseScenario):
         self.spawn_boids()
 
 
-    def reward(self, drone: Agent):
-        if not drone.name.startswith("drone_"):
+    def reward(self, agent: Agent):
+        if not agent.name.startswith("drone_"):
             return torch.zeros(
                 self.world.batch_dim,
                 device=self.world.device,
                 dtype=torch.float32,
             )
           
-        drone_index = self.get_drone_index(drone)
+        drone_index = self.get_drone_index(agent)
         # reward = torch.zeros(
         #     self.world.batch_dim,
         #     device=self.world.device,
@@ -351,10 +351,10 @@ class Scenario(BaseScenario):
         #     )
         # Track whether the drone is currently on a waypoint
         for i, landmark in enumerate(self.world.landmarks):
-            if landmark.state.pos is not None and drone.state.pos is not None:
+            if landmark.state.pos is not None and agent.state.pos is not None:
                 if landmark.name.startswith("goal"):
                     # print(i, landmark.state.pos, drone.state.pos, torch.linalg.vector_norm(landmark.state.pos - drone.state.pos), self.reward_radius)
-                    if self.world.is_overlapping(drone, landmark) and self.waypoint_visits[drone_index, i] == 0:
+                    if self.world.is_overlapping(agent, landmark) and self.waypoint_visits[drone_index, i] == 0:
                         waypoint_index = self.get_waypoint_index(landmark)
                         self.cumulative_reward += 1.0
                         self.waypoint_visits[drone_index, waypoint_index] += 1
@@ -363,8 +363,8 @@ class Scenario(BaseScenario):
                         print(f"reward: {self.cumulative_reward}")
                         print(f"total distance: {self.total_distance[drone_index]}")
                         print("----------------------------")
-                elif self.world.is_overlapping(drone, landmark):
-                    if landmark.collides(drone):
+                elif self.world.is_overlapping(agent, landmark):
+                    if landmark.collides(agent):
                         self.cumulative_reward -= self.cumulative_reward
                         print(f"Collision by drone {drone_index}")
                         print(f"reward: {self.cumulative_reward}")
@@ -372,23 +372,22 @@ class Scenario(BaseScenario):
                         
         #Checking drone collison, with another drone.
         for i, drone2 in enumerate(self.world.agents):
-            if drone != drone2 and self.world.is_overlapping(drone, drone2):
+            if agent != drone2 and self.world.is_overlapping(agent, drone2):
                 self.cumulative_reward -= self.cumulative_reward
-                print(f"drone {drone.name} collided with {drone2.name}!")
+                print(f"drone {agent.name} collided with {drone2.name}!")
                 print(f"reward: {self.cumulative_reward}")
                 print("----------------------------")
         return self.cumulative_reward
 
-    def observation(self, agent: Agent):
+    def observation(self, agent: Agent) -> torch.Tensor:
         if not agent.name.startswith("drone_"):
+            # For now, just return deer position and velocity.
             pos = (agent.state.pos)
             vel = (agent.state.vel)
-            return torch.cat([pos, vel], dim=-1)
-        # only observing drones for now
-        drone = agent
+            return torch.cat([pos if pos is not None else torch.zeros(2, device=agent.device), vel if vel is not None else torch.zeros(2, device=agent.device)], dim=-1)
         # Update distance information
-        drone_index = self.get_drone_index(drone)
-        current_pos = drone.state.pos
+        drone_index = self.get_drone_index(agent)
+        current_pos = agent.state.pos
         prev_pos = self.prev_positions[drone_index]
 
         # Find the distance traveled since the last step
@@ -400,7 +399,7 @@ class Scenario(BaseScenario):
         self.prev_positions[drone_index] = current_pos
 
         # Update rotation information
-        current_rot = drone.state.rot
+        current_rot = agent.state.rot
         prev_rot = self.prev_rotations[drone_index]
 
         # Find the angular displacement since the last move
@@ -425,12 +424,12 @@ class Scenario(BaseScenario):
         # Get positions of all landmarks in this drone's reference frame
         landmark_rel_poses = []
         for landmark in self.world.landmarks:
-            assert landmark.state.pos is not None and drone.state.pos is not None, "Landmark or drone position is None"
-            landmark_rel_poses.append(landmark.state.pos - drone.state.pos)
+            assert landmark.state.pos is not None and agent.state.pos is not None, "Landmark or drone position is None"
+            landmark_rel_poses.append(landmark.state.pos - agent.state.pos)
         return torch.cat(
             [
-                drone.state.pos if drone.state.pos is not None else torch.zeros(2, device=drone.device),
-                drone.state.vel if drone.state.vel is not None else torch.zeros(2, device=drone.device),
+                agent.state.pos if agent.state.pos is not None else torch.zeros(2, device=agent.device),
+                agent.state.vel if agent.state.vel is not None else torch.zeros(2, device=agent.device),
                 *landmark_rel_poses,
             ],
             dim=-1,
