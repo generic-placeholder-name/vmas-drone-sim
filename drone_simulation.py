@@ -5,6 +5,7 @@ import torch
 from graph import *
 
 from vmas import render_interactively
+from vmas.simulator.environment import Environment
 from vmas.simulator.core import Agent, Box, Landmark, Line, Sphere, World
 from vmas.simulator.dynamics.diff_drive import DiffDrive
 from vmas.simulator.dynamics.holonomic_with_rot import HolonomicWithRotation
@@ -181,8 +182,8 @@ class Scenario(BaseScenario):
                 name=f"boid_{j}",
                 collide=True,
                 render_action=False,
-                u_range=[0, 0],
-                u_multiplier=[0.0, 0.0], #[linear, angular]
+                u_range=[1, 1],
+                u_multiplier=[0.05, 0.5], #[linear, angular]
                 shape=Box(length=0.12, width=0.12),
                 color=Color.BLACK,
                 dynamics=DiffDrive(world, integration="rk4"),
@@ -190,8 +191,8 @@ class Scenario(BaseScenario):
             world.add_agent(boid)
             self.boids.append(boid)
         
-        self.total_rotation = torch.zeros(self.n_drones, device=device)  # Track total rotation for each drone
-        self.prev_rotations = [drone.state.rot for drone in self.world.agents[: self.n_drones]]  # Track previous rotation for each drone
+        self.total_rotation = torch.zeros(self.n_drones, world.batch_dim, device=device) # Track total rotation for each drone
+        self.prev_rotations = [drone.state.rot for drone in self.world.agents[: self.n_drones]]
         print(f"World height: {world_height} \
               \nWorld width: {world_width}\n")
         
@@ -259,60 +260,101 @@ class Scenario(BaseScenario):
             self.obs_pos.append(torch.tensor(center, device=device))
 
         self.prev_positions = [drone.state.pos for drone in self.world.agents[: self.n_drones]]
-        self.total_distance = torch.zeros(self.n_drones, device=device)
-        self.spawn_boids()
+        self.total_distance = torch.zeros(self.n_drones, world.batch_dim, device=device)
         
         return world
     
-    
-    def spawn_boids(self):
-            # Scenario only uses a single enviornment, so we always spawn in env_index = 0
-            env_index = 0
-            batch_size = self.world.batch_dim
-            occupied_positions_list = []
+    def apply_boid_forces(self):
+        """Compute and write actions for each boid based on simple rules."""
+        for boid in self.boids:
+            if boid.action.u is None:
+                boid.action.u = torch.zeros(
+                    self.world.batch_dim, 2, device=self.world.device
+                )
+            # Now it's safe to assign
+            boid.action.u[..., 0:1] = 1.
+            boid.action.u[..., 1:2] = 0.1
 
-            for agent in self.world.agents:
-                if agent.name.startswith("drone_"):
-                    assert agent.state.pos is not None
-                    assert torch.is_tensor(agent.state.pos)
-                    pos = agent.state.pos.unsqueeze(1) # [batch_size, 2] -> pos shape: [batch_size, 1, 2]
-                    occupied_positions_list.append(pos)
-                    
-            for object_pos in self.obs_pos:
-                # pos shape: [2] -> pos shape: [batch_size, 2]
-                pos = object_pos.to(self.world.device).expand(batch_size, -1)
-                #  pos shape: [batch_size, 2] -> pos shape: [batch_size, 1, 2]
-                pos = pos.unsqueeze(1)
+    def spawn_boids(self, env_index: int | None):
+        # If env_index is None, we're doing a batched reset on all envs.
+        # If it's an int, VMAS is resetting just that single env.
+        if env_index is None:
+            batch_size = self.world.batch_dim
+        else:
+            batch_size = 1
+
+        occupied_positions_list = []
+
+        # Drones
+        for agent in self.world.agents:
+            if agent.name.startswith("drone_"):
+                assert agent.state.pos is not None
+                assert torch.is_tensor(agent.state.pos)
+
+                if env_index is None:
+                    # agent.state.pos: [batch_size, 2]
+                    pos = agent.state.pos.unsqueeze(1)  # [batch_size, 1, 2]
+                else:
+                    # take only that env's position -> [2] -> [1, 1, 2]
+                    pos = agent.state.pos[env_index].unsqueeze(0).unsqueeze(1)
+
                 occupied_positions_list.append(pos)
 
-
-            if occupied_positions_list:
-                # get [batch_size, K, 2] where K is the number of occupied entities
-                occupied_positions = torch.cat(occupied_positions_list, dim=1)
+        # Obstacles
+        for object_pos in self.obs_pos:
+            if env_index is None:
+                pos = object_pos.to(self.world.device).expand(batch_size, -1)  # [batch_size, 2]
             else:
-                occupied_positions = torch.Tensor()
+                # single env -> [1, 2]
+                pos = object_pos.to(self.world.device).unsqueeze(0)
 
-            ScenarioUtils.spawn_entities_randomly(
-                entities=self.boids,
-                world=self.world,
-                env_index=env_index,
-                min_dist_between_entities=self.min_distance_between_entities,
-                x_bounds=(-self.x_bounds, self.x_bounds),
-                y_bounds=(-self.y_bounds, self.y_bounds),
-                occupied_positions=occupied_positions,
+            pos = pos.unsqueeze(1)  # [..., 1, 2]
+            occupied_positions_list.append(pos)
+
+        if occupied_positions_list:
+            occupied_positions = torch.cat(occupied_positions_list, dim=1)  # [batch_size, K, 2]
+        else:
+            occupied_positions = torch.empty(
+                (batch_size, 0, 2),
+                device=self.world.device,
             )
+
+        ScenarioUtils.spawn_entities_randomly(
+            entities=self.boids,
+            world=self.world,
+            env_index=env_index,
+            min_dist_between_entities=self.min_distance_between_entities,
+            x_bounds=(-self.x_bounds, self.x_bounds),
+            y_bounds=(-self.y_bounds, self.y_bounds),
+            occupied_positions=occupied_positions,
+        )
 
 
     def reset_world_at(self, env_index: int | None = None):
         n_goals = len(self.waypoints)
         drones = [self.world.agents[i] for i in torch.randperm(self.n_drones).tolist()]
-        goals = [self.world.landmarks[i] for i in torch.range(start=0,end=n_goals-1,dtype=torch.int).tolist()]
+        goals = [self.world.landmarks[i] for i in torch.arange(0, n_goals, dtype=torch.int).tolist()]
         order = range(len(self.world.landmarks[n_goals :]))
         obstacles = [self.world.landmarks[n_goals :][i] for i in order]
-        self.waypoint_visits = torch.zeros([self.n_drones, len(self.waypoints)], device=self.world.device) # reset the counter
-        self.total_distance = torch.tensor([0.0 for _ in self.world.agents])
-        self.total_rotation = torch.zeros(self.n_drones, device=self.world.device)  # Reset total rotation
-        self.prev_rotations = [drone.state.rot for drone in self.world.agents[: self.n_drones]] # Reset previous rotations
+        self.waypoint_visits = torch.zeros(
+            [self.n_drones, len(self.waypoints)],
+            device=self.world.device,
+        )  # reset the counter
+
+        self.total_distance = torch.zeros(
+            self.n_drones,
+            self.world.batch_dim,
+            device=self.world.device,
+        )
+        self.total_rotation = torch.zeros(
+            self.n_drones,
+            self.world.batch_dim,
+            device=self.world.device,
+        )
+
+        self.prev_rotations = [drone.state.rot for drone in self.world.agents[: self.n_drones]]
+        self.prev_positions = [drone.state.pos for drone in self.world.agents[: self.n_drones]]
+
         for i, goal in enumerate(goals):
             goal.set_pos(
                 scale_coordinate(self.waypoints[i].point),
@@ -332,7 +374,7 @@ class Scenario(BaseScenario):
  
             )
         
-        self.spawn_boids()
+        self.spawn_boids(env_index)
 
 
     def reward(self, agent: Agent):
@@ -353,8 +395,8 @@ class Scenario(BaseScenario):
         for i, landmark in enumerate(self.world.landmarks):
             if landmark.state.pos is not None and agent.state.pos is not None:
                 if landmark.name.startswith("goal"):
-                    # print(i, landmark.state.pos, drone.state.pos, torch.linalg.vector_norm(landmark.state.pos - drone.state.pos), self.reward_radius)
-                    if self.world.is_overlapping(agent, landmark) and self.waypoint_visits[drone_index, i] == 0:
+                    overlap = self.world.is_overlapping(agent, landmark)  # tensor [batch_dim]
+                    if overlap.any() and self.waypoint_visits[drone_index, i] == 0:
                         waypoint_index = self.get_waypoint_index(landmark)
                         self.cumulative_reward += 1.0
                         self.waypoint_visits[drone_index, waypoint_index] += 1
@@ -363,16 +405,18 @@ class Scenario(BaseScenario):
                         print(f"reward: {self.cumulative_reward}")
                         print(f"total distance: {self.total_distance[drone_index]}")
                         print("----------------------------")
-                elif self.world.is_overlapping(agent, landmark):
-                    if landmark.collides(agent):
-                        self.cumulative_reward -= self.cumulative_reward
-                        print(f"Collision by drone {drone_index}")
-                        print(f"reward: {self.cumulative_reward}")
-                        print("----------------------------")
+                elif self.world.is_overlapping(agent, landmark).any():
+                    overlap = self.world.is_overlapping(agent, landmark)
+                    if overlap.any():
+                        if landmark.collides(agent):
+                            self.cumulative_reward -= self.cumulative_reward
+                            print(f"Collision by drone {drone_index}")
+                            print(f"reward: {self.cumulative_reward}")
+                            print("----------------------------")
                         
         #Checking drone collison, with another drone.
         for i, drone2 in enumerate(self.world.agents):
-            if agent != drone2 and self.world.is_overlapping(agent, drone2):
+            if agent != drone2 and self.world.is_overlapping(agent, drone2).any():
                 self.cumulative_reward -= self.cumulative_reward
                 print(f"drone {agent.name} collided with {drone2.name}!")
                 print(f"reward: {self.cumulative_reward}")
@@ -457,6 +501,41 @@ class Scenario(BaseScenario):
         return geoms
 
 if __name__ == "__main__":
-    render_interactively(
-        Scenario(), control_two_agents=True, shared_reward=True
+    device = torch.device("cpu")
+    scenario = Scenario()
+    env = Environment(
+        scenario=scenario,
+        n_envs=1,
+        device=device,
     )
+
+    obs = env.reset()
+
+    for t in range(1000):
+        # 1) Let scenario compute boid actions from forces
+        scenario.apply_boid_forces()
+
+        # 2) Compute drone actions, e.g. using your Control class
+        actions = {}
+        for agent in env.agents:
+            if agent.action.u is None:
+                agent.action.u = torch.zeros(env.batch_dim, 2, device=device)
+            assert agent.action.u is not None
+            if agent.name.startswith("drone_"):
+                # TODO: Set drone action with RL later
+                agent.action.u[:] = 0.0
+            # boids had action.u set in apply_boid_forces
+            actions[agent.name] = agent.action.u
+
+        # 3) Step the environment
+        obs, rew, done, info = env.step(actions)
+
+        # 4) Optional: render
+        env.render(mode="human")
+
+        if done.any():
+            break
+
+    # render_interactively(
+    #     Scenario(), control_two_agents=True, shared_reward=True
+    # )
