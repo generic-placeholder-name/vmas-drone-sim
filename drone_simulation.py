@@ -1,6 +1,8 @@
 import typing
 from typing import List
 
+import json
+
 import torch
 from graph import *
 
@@ -13,25 +15,6 @@ from vmas.simulator.utils import Color, ScenarioUtils
 if typing.TYPE_CHECKING:
     from vmas.simulator.rendering import Geom
 
-# Coordinates taken from image on Google Docs.
-# Reward areas are areas with crops; penalty areas are the house and the greenhouse
-# Original frame coordinates
-# original_top_left = [181, 7]
-# original_bottom_right = [486, 253]
-# Changed to meters x meters of farm, measured from google maps
-original_top_left = [0, 0]
-original_bottom_right = [245, 190]
-
-original_width = original_bottom_right[0] - original_top_left[0]
-original_height = original_bottom_right[1] - original_top_left[1]
-
-# Find the center of the original region
-center_x = (original_top_left[0] + original_bottom_right[0]) / 2
-center_y = (original_top_left[1] + original_bottom_right[1]) / 2
-
-# Scale based on shorter side to fit within [-1, 1]
-scale = 2 / min(original_width, original_height) #2 units / 190 meters
-
 def scale_coordinate(coord):
     """converts meters to [-1, 1] coordinates"""
     x, y = coord
@@ -43,70 +26,47 @@ def convert_to_original_units(scaled_coord):
     return [x / scale + center_x, y / scale + center_y]
 
 
-envConfig = {
-    "origBorders": { # for retrieval in ACO file
-        "topLeft": original_top_left,
-        "bottomRight": original_bottom_right
-    },
-    "borders": {
-        "topLeft": scale_coordinate(original_top_left),
-        "bottomRight": scale_coordinate(original_bottom_right)
-    },
-    "rewardAreas": [
-        [scale_coordinate([0, 0]), 
-         scale_coordinate([original_width, 0]), 
-         scale_coordinate([original_width, original_height]), 
-         scale_coordinate([0, original_height])]
-        # [scale_coordinate(coord) for coord in [
-        #     [187, 130], [241, 153], [265, 153], [261, 240], [184, 239]
-        # ]],
-        # [scale_coordinate(coord) for coord in [
-        #     [213, 58], [229, 57], [244, 77], [274, 78], [305, 67], [293, 140], [255, 140], [204, 120]
-        # ]],
-        # [scale_coordinate(coord) for coord in [
-        #     [311, 58], [360, 60], [360, 140], [303, 140]
-        # ]],
-        # [scale_coordinate(coord) for coord in [
-        #     [365, 16], [471, 15], [475, 87], [364, 89]
-        # ]],
-        # [scale_coordinate(coord) for coord in [
-        #     [372, 173], [477, 174], [480, 240], [370, 241]
-        # ]],
-        # [scale_coordinate(coord) for coord in [
-        #     [381, 98], [476, 92], [479, 166], [382, 164]
-        # ]]
-    ],
-    "penaltyAreas": [ 
-        {
-            #Second coordinate is subtracted because  value, i.e. 500, was measured from top-left of image, vmas wants it from bottom left
-            "topLeft": [107, original_height-152],  
-            "bottomRight": [130, original_height-122],
-            "type": "box"
-        },
-        {
-            "topLeft": [148, original_height-104],
-            "bottomRight": [160, original_height-74],
-            "type": "box"
-        },
-        {
-            "topLeft": [107, original_height-183],
-            "bottomRight": [122, original_height-168],
-            "type": "circle",
-        },
-        {
-            "topLeft": [53, original_height-61],
-            "bottomRight": [69, original_height-46],
-            "type": "circle",
-        }
-    ],
-    "startingPoints": [
-        scale_coordinate([105, 150]),
-        scale_coordinate([125, 150])
-    ]
-}
+def load_env_config(path):
+    global center_x, center_y, scale  
 
-# In polygon check (useful for distributing reward points)
-# Uses matplotlib (which is probably not the best)
+    import json
+    with open(path, "r") as f:
+        cfg = json.load(f)
+
+    ox1, oy1 = cfg["origBorders"]["topLeft"]
+    ox2, oy2 = cfg["origBorders"]["bottomRight"]
+
+    width  = ox2 - ox1
+    height = oy2 - oy1
+
+    center_x = (ox1 + ox2) / 2
+    center_y = (oy1 + oy2) / 2
+    scale    = 2 / min(width, height)
+
+    cfg["borders"] = {
+        "topLeft": scale_coordinate([ox1, oy1]),
+        "bottomRight": scale_coordinate([ox2, oy2])
+    }
+
+    cols = cfg["grid"]["cols"]
+    rows = cfg["grid"]["rows"]
+
+    cell_w = width / cols
+    cell_h = height / rows
+
+    scaled_starts = []
+    for col, row in cfg["startingPoints"]:
+        mx = ox1 + (col - 0.5) * cell_w
+        my = oy1 + (row - 0.5) * cell_h
+        scaled_starts.append(scale_coordinate([mx, my]))
+
+    cfg["startingPoints"] = scaled_starts
+
+    return cfg
+
+envConfig = load_env_config("envConfig.json")
+
+# In polygon check (useful for distributing reward points) - left for reference
 from matplotlib.path import Path
 def is_point_in_polygon(point, polygon_coords):
     """
@@ -136,7 +96,7 @@ class Scenario(BaseScenario):
         self.reward_radius = 0.01
         self.visualize_semidims = True
 
-        # Extract world dimensions from envConfig
+        # Extract world dimensions from envConfig (these are scaled coords)
         world_width = self.env_config["borders"]["bottomRight"][0]
         world_height = self.env_config["borders"]["bottomRight"][1]
 
@@ -325,11 +285,8 @@ class Scenario(BaseScenario):
             )
         for i, obstacle in enumerate(obstacles):
             obstacle.set_pos(
- 
                 self.obs_pos[i],
- 
                 batch_index=env_index,
- 
             )
         
         self.spawn_boids()
@@ -412,8 +369,6 @@ class Scenario(BaseScenario):
             angular_displacement = current_rot - prev_rot  # Gets change in rotation
             # Handle if rotation goes from 2π to 0
             angular_displacement = (angular_displacement + torch.pi) % (2 * torch.pi) - torch.pi
-            # Change angular displacement from radians to degrees
-            # angular_displacement_degrees = angular_displacement * (180 / torch.pi)
 
             # Add absolute value angular displacement
             self.total_rotation[drone_index] += torch.abs(angular_displacement)
