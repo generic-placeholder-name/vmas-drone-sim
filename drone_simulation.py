@@ -1,6 +1,8 @@
 import typing
 from typing import List
 
+import json
+
 import torch
 from graph import *
 
@@ -13,22 +15,6 @@ from vmas.simulator.utils import Color, ScenarioUtils
 if typing.TYPE_CHECKING:
     from vmas.simulator.rendering import Geom
 
-# Coordinates taken from image on Google Docs.
-# Reward areas are areas with crops; penalty areas are the house and the greenhouse
-# Original frame coordinates
-original_top_left = [0, 0]
-original_bottom_right = [144, 96]
-
-original_width = original_bottom_right[0] - original_top_left[0]
-original_height = original_bottom_right[1] - original_top_left[1]
-
-# Find the center of the original region
-center_x = (original_top_left[0] + original_bottom_right[0]) / 2
-center_y = (original_top_left[1] + original_bottom_right[1]) / 2
-
-# Scale based on shorter side to fit within [-1, 1]
-scale = 2 / min(original_width, original_height) #2 units / 190 meters
-
 def scale_coordinate(coord):
     """converts meters to [-1, 1] coordinates"""
     x, y = coord
@@ -40,30 +26,45 @@ def convert_to_original_units(scaled_coord):
     return [x / scale + center_x, y / scale + center_y]
 
 
-envConfig = {
-    "origBorders": { # for retrieval in ACO file
-        "topLeft": original_top_left,
-        "bottomRight": original_bottom_right
-    },
-    "borders": {
-        "topLeft": scale_coordinate(original_top_left),
-        "bottomRight": scale_coordinate(original_bottom_right)
-    },
-    # grid config: cols x rows and obstacles as (col,row) 1-based indices
-    "grid": {
-        "cols": 12,
-        "rows": 8,
-        "obstacles": [
-            (2,2), (3,2), (3,7), (4,4), (5,5), (5,6), (6,5), (6,6),
-            (9,3), (9,4), (9,5), (9,7), (9,8), (10,3), (10,7)
-        ]
-    },
-    # starting points (still in scaled coords)
-    "startingPoints": [
-        scale_coordinate([6, 6]),
-        scale_coordinate([144-6, 96-6])
-    ]
-}
+def load_env_config(path):
+    global center_x, center_y, scale  
+
+    import json
+    with open(path, "r") as f:
+        cfg = json.load(f)
+
+    ox1, oy1 = cfg["origBorders"]["topLeft"]
+    ox2, oy2 = cfg["origBorders"]["bottomRight"]
+
+    width  = ox2 - ox1
+    height = oy2 - oy1
+
+    center_x = (ox1 + ox2) / 2
+    center_y = (oy1 + oy2) / 2
+    scale    = 2 / min(width, height)
+
+    cfg["borders"] = {
+        "topLeft": scale_coordinate([ox1, oy1]),
+        "bottomRight": scale_coordinate([ox2, oy2])
+    }
+
+    cols = cfg["grid"]["cols"]
+    rows = cfg["grid"]["rows"]
+
+    cell_w = width / cols
+    cell_h = height / rows
+
+    scaled_starts = []
+    for col, row in cfg["startingPoints"]:
+        mx = ox1 + (col - 0.5) * cell_w
+        my = oy1 + (row - 0.5) * cell_h
+        scaled_starts.append(scale_coordinate([mx, my]))
+
+    cfg["startingPoints"] = scaled_starts
+
+    return cfg
+
+envConfig = load_env_config("envConfig.json")
 
 # In polygon check (useful for distributing reward points) - left for reference
 from matplotlib.path import Path
@@ -91,7 +92,7 @@ class Scenario(BaseScenario):
         ScenarioUtils.check_kwargs_consumed(kwargs)
 
         self.n_agents = 2
-        self.agent_radius = 0.03333
+        self.agent_radius = 0.01
         self.reward_radius = 0.01
         self.visualize_semidims = True
 
@@ -197,8 +198,8 @@ class Scenario(BaseScenario):
 
                 # If this cell is an obstacle, create obstacle landmark occupying the entire cell
                 if (col, row) in obstacle_cells:
-                    length = cell_w
-                    width = cell_h
+                    length = cell_w - 2 * self.agent_radius
+                    width = cell_h - 2 * self.agent_radius
                     obstacle_shape = Box(length=length.item() if isinstance(length, torch.Tensor) else length,
                                          width=width.item() if isinstance(width, torch.Tensor) else width)
                     obstacle = Landmark(
